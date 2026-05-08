@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Acceso — Generador de Constancias</title>
+  <link rel="stylesheet" href="/static/styles.css">
+  <style>
+    .login-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    @media (max-width: 720px) { .login-grid { grid-template-columns: 1fr; } }
+  </style>
+</head>
+<body>
+  <div class="page" style="max-width: 760px;">
+    <div class="header">
+      <div class="brand">
+        <h1>Generador de Constancias</h1>
+        <p>Centro Universitario UAEM Tianguistenco</p>
+      </div>
+      <button id="themeToggle" class="btn-ghost" type="button">Modo claro</button>
+    </div>
+
+    {% if request.query_params.get("error") == "password" %}
+      <div class="note" style="border-color: rgba(255,107,107,.35); background: rgba(255,107,107,.12);">
+        Contraseña incorrecta.
+      </div>
+    {% endif %}
+
+    <div class="login-grid">
+      <div class="card">
+        <h2>Invitado</h2>
+        <p>Generación de constancias con la base de datos y plantilla actuales. Sin permisos para subir archivos.</p>
+        <form action="/login" method="post">
+          <input type="hidden" name="rol" value="invitado">
+          <div class="actions">
+            <button type="submit">Entrar como invitado</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="card">
+        <h2>Administrador</h2>
+        <p>Acceso completo: subir base de datos, reemplazar plantilla universal y configurar el periodo activo.</p>
+        <form action="/login" method="post">
+          <input type="hidden" name="rol" value="admin">
+          <div class="field">
+            <label>Contraseña</label>
+            <input type="password" name="password" required autofocus>
+          </div>
+          <div class="actions">
+            <button type="submit">Entrar como admin</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+  <script src="/static/theme.js"></script>
+</body>
+</html>

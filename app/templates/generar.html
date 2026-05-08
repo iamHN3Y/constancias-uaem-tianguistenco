@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Generar — {{ alumno.NombreAlumno }}</title>
+  <link rel="stylesheet" href="/static/styles.css">
+  <style>
+    .page { max-width: 1600px; }
+    .layout { display: grid; grid-template-columns: 380px 1fr; gap: 16px; align-items: start; }
+    @media (max-width: 1100px) { .layout { grid-template-columns: 1fr; } }
+    .preview-col { position: sticky; top: 12px; }
+
+    .form-col textarea {
+      width: 100%; min-height: 64px; padding: 10px 12px;
+      border-radius: 12px; border: 1px solid var(--border);
+      background: rgba(0,0,0,.18); color: var(--text); resize: vertical;
+      font-family: inherit; font-size: 14px;
+    }
+    .form-col textarea:focus { outline: none; border-color: rgba(110,231,255,.55); }
+
+    .radio-row { display: flex; gap: 12px; }
+    .radio-row label { display: flex; align-items: center; gap: 6px; color: var(--text); }
+
+    .date-row { display: flex; gap: 8px; align-items: center; }
+    .date-row > div { flex: 1; }
+    .date-row .small { font-size: 11px; color: var(--muted); margin-bottom: 2px; }
+
+    .comodin-bar { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; }
+    .comodin-bar select { flex: 1; padding: 6px 8px; border-radius: 8px;
+      border: 1px solid var(--border); background: rgba(0,0,0,.18);
+      color: var(--text); font-size: 12px; }
+    .comodin-bar button { padding: 6px 10px; font-size: 12px; }
+
+    .pdf-frame {
+      width: 100%; height: calc(100vh - 80px); min-height: 720px;
+      border: 1px solid var(--border); border-radius: 12px;
+      background: rgba(0,0,0,.30);
+    }
+
+    .preview-status {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 4px 10px; border-radius: 999px; font-size: 12px;
+      background: rgba(255,255,255,.04); border: 1px solid var(--border);
+      color: var(--muted);
+    }
+
+    .field-opcional { position: relative; }
+    .field-opcional .hint {
+      font-size: 11px; color: var(--muted); margin-top: 4px;
+    }
+
+    .alumno-info {
+      display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 8px 14px; font-size: 12px; color: var(--muted);
+      padding: 10px 12px; border: 1px solid var(--border);
+      border-radius: 12px; background: rgba(0,0,0,.12); margin-bottom: 14px;
+    }
+    .alumno-info b { color: var(--text); }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="header">
+      <div class="brand">
+        <h1>Constancia</h1>
+        <p>{{ alumno.NombreAlumno }} · cuenta {{ alumno.Cuenta }}</p>
+      </div>
+      <a class="btn-ghost" href="/"
+         style="padding:10px 14px;border-radius:12px;border:1px solid var(--border);background:rgba(255,255,255,.04);color:var(--text);">
+         Cancelar
+      </a>
+    </div>
+
+    <div class="alumno-info">
+      <div><b>Plan</b> {{ alumno.Plan }}</div>
+      <div><b>Periodo inicio</b> {{ alumno.PerInicio }}</div>
+      <div><b>Periodo activo</b> {{ ajustes.get('periodo_actual', '—') }}</div>
+      <div><b>PrmGR</b> {{ alumno.PrmGR }}</div>
+      <div><b>Per (último)</b> {{ alumno.Per }}</div>
+      <div><b>Sit</b> {{ alumno.Sit }}</div>
+    </div>
+
+    <div class="layout">
+      <div class="form-col">
+        <div class="card">
+          <h2>Campos</h2>
+          <form id="formCampos">
+            <input type="hidden" name="cuenta" value="{{ alumno.Cuenta }}">
+
+            {% for c in campos %}
+              <div class="field {% if c.opcional %}field-opcional{% endif %}">
+                <label>{{ c.label }}{% if c.opcional %} <span class="hint">(opcional)</span>{% endif %}</label>
+
+                {% if c.tipo == "radio_genero" %}
+                  <div class="radio-row">
+                    <label><input type="radio" name="__genero__" value="M" required> Masculino</label>
+                    <label><input type="radio" name="__genero__" value="F"> Femenino</label>
+                  </div>
+                  <input type="hidden" name="campo_{{ c.name }}" value="">
+                {% elif c.tipo == "textarea" %}
+                  {% if c.name == "LINEA_LIBRE" %}
+                    <div class="comodin-bar">
+                      <select id="comodinSelector"><option value="">— Insertar comodín —</option></select>
+                      <button type="button" id="btnGuardarComodin" class="btn-ghost"
+                        style="border:1px solid var(--border);background:rgba(255,255,255,.04);color:var(--text);border-radius:8px;">
+                        + Guardar
+                      </button>
+                      <button type="button" id="btnEliminarComodin" class="btn-ghost danger"
+                        style="border:1px solid rgba(255,107,107,.40);background:rgba(255,107,107,.18);color:var(--text);border-radius:8px;"
+                        title="Eliminar el comodín seleccionado">
+                        🗑
+                      </button>
+                    </div>
+                  {% endif %}
+                  <textarea name="campo_{{ c.name }}" rows="2"
+                    {% if c.opcional %}placeholder="Vacío para omitir esta línea"{% endif %}>{{ c.valor }}</textarea>
+                {% elif c.tipo == "date_corto" or c.tipo == "date_largo" %}
+                  <input type="date" name="fecha_{{ c.name }}" value="{{ c.iso }}">
+                {% elif c.tipo == "date_rango" %}
+                  <div class="date-row">
+                    <div>
+                      <div class="small">Inicio</div>
+                      <input type="date" name="fecha_VAC_INICIO" value="{{ c.iso_inicio }}">
+                    </div>
+                    <div>
+                      <div class="small">Fin</div>
+                      <input type="date" name="fecha_VAC_FIN" value="{{ c.iso_fin }}">
+                    </div>
+                  </div>
+                {% else %}
+                  <input type="text" name="campo_{{ c.name }}" value="{{ c.valor }}">
+                {% endif %}
+              </div>
+            {% endfor %}
+
+            <div class="hr"></div>
+            <div class="actions">
+              <button type="button" id="btnDocx">Descargar .docx</button>
+              <button type="button" id="btnPdf">Descargar .pdf</button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <div class="preview-col">
+        <div class="card">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:10px;">
+            <h2 style="margin:0;">Vista previa</h2>
+            <span id="status" class="preview-status">listo</span>
+          </div>
+          <iframe id="pdfFrame" class="pdf-frame" title="Vista previa PDF"></iframe>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="/static/theme.js"></script>
+  <script>
+    const form = document.getElementById("formCampos");
+    const frame = document.getElementById("pdfFrame");
+    const status = document.getElementById("status");
+    const btnDocx = document.getElementById("btnDocx");
+    const btnPdf = document.getElementById("btnPdf");
+
+    let lastObjectUrl = null;
+    let pendingTimer = null;
+    let abortCtrl = null;
+
+    function setStatus(text, error = false) {
+      status.textContent = text;
+      status.style.borderColor = error ? "rgba(255,107,107,.45)" : "var(--border)";
+      status.style.background = error ? "rgba(255,107,107,.12)" : "rgba(255,255,255,.04)";
+    }
+
+    async function refreshPreview() {
+      if (abortCtrl) abortCtrl.abort();
+      abortCtrl = new AbortController();
+      setStatus("generando…");
+      try {
+        const res = await fetch("/preview.pdf", {
+          method: "POST",
+          body: new FormData(form),
+          signal: abortCtrl.signal,
+        });
+        if (!res.ok) {
+          setStatus("error " + res.status, true);
+          return;
+        }
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        // Mantener la página actual del visor cuando se regenera
+        const prevSrc = frame.src;
+        const hash = prevSrc.includes("#") ? "#" + prevSrc.split("#")[1] : "";
+        frame.src = url + hash;
+        if (lastObjectUrl) URL.revokeObjectURL(lastObjectUrl);
+        lastObjectUrl = url;
+        setStatus("actualizado");
+      } catch (e) {
+        if (e.name !== "AbortError") setStatus("error", true);
+      }
+    }
+
+    function debouncedRefresh() {
+      if (pendingTimer) clearTimeout(pendingTimer);
+      pendingTimer = setTimeout(refreshPreview, 700);
+    }
+
+    form.addEventListener("input", debouncedRefresh);
+    form.addEventListener("change", debouncedRefresh);
+
+    async function descargar(url, ext) {
+      const fd = new FormData(form);
+      // validar género al descargar
+      if (!fd.get("__genero__") && [...fd.keys()].some(k => k === "__genero__")) {
+        alert("Selecciona el género antes de descargar.");
+        return;
+      }
+      const res = await fetch(url, { method: "POST", body: fd });
+      if (!res.ok) {
+        alert("Error generando archivo: " + res.status);
+        return;
+      }
+      const blob = await res.blob();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = "Constancia_{{ alumno.Cuenta }}." + ext;
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+    }
+
+    btnDocx.addEventListener("click", () => descargar("/generar/docx", "docx"));
+    btnPdf.addEventListener("click", () => descargar("/generar/pdf", "pdf"));
+
+    // primer render
+    refreshPreview();
+
+    // ---------- Comodines (snippets para LINEA_LIBRE) ----------
+    const taLibre = form.querySelector('textarea[name="campo_LINEA_LIBRE"]');
+    const selComodin = document.getElementById("comodinSelector");
+    const btnGuardarCmd = document.getElementById("btnGuardarComodin");
+    const btnEliminarCmd = document.getElementById("btnEliminarComodin");
+
+    if (taLibre && selComodin) {
+      let comodinesCache = [];
+
+      function pintarOpciones() {
+        selComodin.innerHTML = '<option value="">— Insertar comodín —</option>';
+        for (const c of comodinesCache) {
+          const opt = document.createElement("option");
+          opt.value = c.id;
+          opt.textContent = c.titulo;
+          selComodin.appendChild(opt);
+        }
+      }
+
+      async function cargar() {
+        try {
+          const res = await fetch("/comodines");
+          comodinesCache = await res.json();
+          pintarOpciones();
+        } catch (e) { /* silencio */ }
+      }
+
+      selComodin.addEventListener("change", () => {
+        const c = comodinesCache.find(x => x.id === selComodin.value);
+        if (c) {
+          taLibre.value = c.texto;
+          taLibre.dispatchEvent(new Event("input", { bubbles: true }));
+        }
+      });
+
+      btnGuardarCmd.addEventListener("click", async () => {
+        const texto = taLibre.value.trim();
+        if (!texto) { alert("Escribe algo en la línea libre antes de guardarlo."); return; }
+        const titulo = prompt("Título del comodín:");
+        if (!titulo || !titulo.trim()) return;
+        const fd = new FormData();
+        fd.append("titulo", titulo.trim());
+        fd.append("texto", texto);
+        const res = await fetch("/comodines", { method: "POST", body: fd });
+        if (!res.ok) { alert("No se pudo guardar."); return; }
+        const nuevo = await res.json();
+        comodinesCache.push(nuevo);
+        pintarOpciones();
+        selComodin.value = nuevo.id;
+      });
+
+      btnEliminarCmd.addEventListener("click", async () => {
+        const id = selComodin.value;
+        if (!id) { alert("Selecciona un comodín a eliminar."); return; }
+        const c = comodinesCache.find(x => x.id === id);
+        if (!confirm(`¿Eliminar comodín "${c.titulo}"?`)) return;
+        const res = await fetch(`/comodines/${id}`, { method: "DELETE" });
+        if (!res.ok) { alert("No se pudo eliminar."); return; }
+        comodinesCache = comodinesCache.filter(x => x.id !== id);
+        pintarOpciones();
+      });
+
+      cargar();
+    }
+  </script>
+</body>
+</html>

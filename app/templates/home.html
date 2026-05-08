@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Generador de Constancias</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <div class="page">
+    <div class="header">
+      <div class="brand">
+        <h1>Generador de Constancias</h1>
+        <p>Centro Universitario UAEM Tianguistenco</p>
+      </div>
+      <div style="display:flex; gap:8px; align-items:center;">
+        <span class="preview-status" style="display:inline-flex; padding:4px 10px; border-radius:999px; font-size:12px; background:rgba(255,255,255,.04); border:1px solid var(--border); color:var(--muted);">
+          {% if es_admin %}Administrador{% else %}Invitado{% endif %}
+        </span>
+        <form action="/logout" method="post" style="margin:0;">
+          <button type="submit" class="btn-ghost"
+            style="padding:8px 12px;border-radius:10px;border:1px solid var(--border);background:rgba(255,255,255,.04);color:var(--text);font-size:12px;">
+            Cerrar sesión
+          </button>
+        </form>
+        <button id="themeToggle" class="btn-ghost" type="button">Modo claro</button>
+      </div>
+    </div>
+
+    {% if request.query_params.get("error") == "alumno_no_encontrado" %}
+      <div class="note" style="border-color: rgba(255,107,107,.35); background: rgba(255,107,107,.12);">
+        No se encontró un alumno con la cuenta {{ request.query_params.get("cuenta") }}.
+      </div>
+    {% elif request.query_params.get("error") == "plantilla_no_encontrada" %}
+      <div class="note" style="border-color: rgba(255,107,107,.35); background: rgba(255,107,107,.12);">
+        La plantilla seleccionada ya no existe.
+      </div>
+    {% endif %}
+
+    {% if es_admin %}
+    <div class="grid">
+      <div class="card">
+        <h2>Periodo activo</h2>
+        <p>Define el periodo en curso (ej. <code>2026A</code>). Se usa para calcular el semestre.</p>
+        <form action="/ajustes" method="post">
+          <div class="field">
+            <input type="text" name="periodo_actual" maxlength="6"
+                   value="{{ ajustes.get('periodo_actual', '') }}"
+                   placeholder="2026A" pattern="[0-9]{4}[ABab]" required>
+          </div>
+          <div class="actions">
+            <button type="submit">Guardar</button>
+          </div>
+        </form>
+      </div>
+
+      <div class="card">
+        <h2>Datos cargados</h2>
+        {% if datos %}
+          <p>
+            <strong>{{ datos.filename }}</strong><br>
+            {{ datos.filas }} alumnos · cargado {{ datos.fecha_carga }}
+          </p>
+        {% else %}
+          <p>No hay datos cargados todavía.</p>
+        {% endif %}
+        <div class="actions">
+          <a class="btn-ghost" href="/datos"
+             style="padding:10px 14px;border-radius:12px;border:1px solid var(--border);background:rgba(255,255,255,.04);color:var(--text);">
+             Gestionar datos
+          </a>
+        </div>
+      </div>
+    </div>
+    {% else %}
+    <div class="card">
+      <h2>Estado</h2>
+      <p style="color: var(--muted); font-size: 13px; margin: 0;">
+        Periodo activo <strong>{{ ajustes.get('periodo_actual', '—') }}</strong>
+        {% if datos %} · {{ datos.filas }} alumnos cargados{% endif %}
+      </p>
+    </div>
+    {% endif %}
+
+    <div class="hr"></div>
+
+    <div class="card">
+      <h2>Generar constancia</h2>
+      {% if not datos %}
+        <p>{% if es_admin %}Sube primero un archivo de datos.{% else %}No hay datos cargados. Pídele al administrador que los suba.{% endif %}</p>
+      {% elif not plantilla %}
+        <p>{% if es_admin %}No hay plantilla cargada. <a href="/plantillas">Sube una</a> antes de generar.{% else %}No hay plantilla cargada. Pídele al administrador que la suba.{% endif %}</p>
+      {% else %}
+        <form action="/buscar" method="post">
+          <div class="field">
+            <label>Número de cuenta</label>
+            <input type="text" name="cuenta" placeholder="Ej. 2014694" required>
+          </div>
+          <div class="actions">
+            <button type="submit">Buscar y continuar</button>
+          </div>
+        </form>
+      {% endif %}
+    </div>
+
+    {% if es_admin %}
+    <div class="hr"></div>
+
+    <div class="card">
+      <h2>Plantilla universal</h2>
+      {% if plantilla %}
+        <p style="color: var(--muted); font-size: 13px;">
+          {{ plantilla.placeholders|length }} placeholders detectados · cargada {{ plantilla.fecha_carga }}
+        </p>
+      {% else %}
+        <p>No hay plantilla cargada todavía.</p>
+      {% endif %}
+      <div class="actions" style="margin-top: 14px;">
+        <a class="btn-ghost" href="/plantillas"
+           style="padding:10px 14px;border-radius:12px;border:1px solid var(--border);background:rgba(255,255,255,.04);color:var(--text);">
+           Gestionar plantilla
+        </a>
+      </div>
+    </div>
+    {% endif %}
+  </div>
+  <script src="/static/theme.js"></script>
+</body>
+</html>

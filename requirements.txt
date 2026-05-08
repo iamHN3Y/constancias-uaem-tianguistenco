@@ -1,0 +1,9 @@
+fastapi
+uvicorn[standard]
+python-docx
+pandas
+openpyxl
+xlrd
+jinja2
+python-multipart
+num2words

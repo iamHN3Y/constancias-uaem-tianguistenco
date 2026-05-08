@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Plantilla universal</title>
+  <link rel="stylesheet" href="/static/styles.css">
+  <style>
+    .phs { margin-top: 6px; display: flex; flex-wrap: wrap; gap: 6px; }
+    .phs code {
+      font-size: 11px; padding: 2px 6px; border-radius: 6px;
+      background: rgba(156,132,18,.18); border: 1px solid rgba(156,132,18,.30);
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="header">
+      <div class="brand">
+        <h1>Plantilla universal</h1>
+        <p>Un único <code>.docx</code> con placeholders <code>[[CAMPO]]</code>. Las líneas opcionales se eliminan solas si quedan vacías.</p>
+      </div>
+      <a class="btn-ghost" href="/"
+         style="padding:10px 14px;border-radius:12px;border:1px solid var(--border);background:rgba(255,255,255,.04);color:var(--text);">
+         Volver
+      </a>
+    </div>
+
+    <div class="card">
+      <h2>Estado actual</h2>
+      {% if plantilla %}
+        <p>
+          <strong>{{ plantilla.filename }}</strong><br>
+          {{ plantilla.placeholders|length }} placeholders · cargada {{ plantilla.fecha_carga }}
+        </p>
+        <div class="phs">
+          {% for ph in plantilla.placeholders %}<code>{{ ph }}</code>{% endfor %}
+        </div>
+      {% else %}
+        <p>Aún no hay plantilla. Sube un <code>.docx</code> abajo.</p>
+      {% endif %}
+    </div>
+
+    <div class="hr"></div>
+
+    <div class="card">
+      <h2>Subir / reemplazar</h2>
+      <p>El archivo nuevo sustituye a la plantilla actual.</p>
+      <form action="/plantillas/upload" method="post" enctype="multipart/form-data">
+        <div class="field">
+          <label>Archivo (.docx)</label>
+          <input type="file" name="archivo" accept=".docx" required>
+        </div>
+        <div class="actions">
+          <button type="submit">Subir</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  <script src="/static/theme.js"></script>
+</body>
+</html>

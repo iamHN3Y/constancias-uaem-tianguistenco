@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Datos de alumnos</title>
+  <link rel="stylesheet" href="/static/styles.css">
+</head>
+<body>
+  <div class="page">
+    <div class="header">
+      <div class="brand">
+        <h1>Datos de alumnos</h1>
+        <p>El archivo persiste hasta que lo reemplaces.</p>
+      </div>
+      <a class="btn-ghost" href="/"
+         style="padding:10px 14px;border-radius:12px;border:1px solid var(--border);background:rgba(255,255,255,.04);color:var(--text);">
+         Volver
+      </a>
+    </div>
+
+    <div class="card">
+      <h2>Estado actual</h2>
+      {% if datos %}
+        <p>
+          <strong>{{ datos.filename }}</strong><br>
+          {{ datos.filas }} alumnos · cargado {{ datos.fecha_carga }}
+        </p>
+      {% else %}
+        <p>Aún no se ha cargado ningún archivo.</p>
+      {% endif %}
+    </div>
+
+    <div class="hr"></div>
+
+    <div class="card">
+      <h2>Subir / reemplazar</h2>
+      <p>Formatos aceptados: <code>.xls</code>, <code>.xlsx</code>, <code>.csv</code>. El archivo nuevo sustituye al anterior.</p>
+      <form action="/datos/upload" method="post" enctype="multipart/form-data">
+        <div class="field">
+          <input type="file" name="archivo" accept=".xls,.xlsx,.csv" required>
+        </div>
+        <div class="actions">
+          <button type="submit">Subir</button>
+        </div>
+      </form>
+    </div>
+  </div>
+  <script src="/static/theme.js"></script>
+</body>
+</html>
