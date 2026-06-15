@@ -13,6 +13,10 @@ desktop.ini
 .idea/
 .vscode/
 
+# Datos sensibles / de usuario — NO versionar (montados como volumen)
+data/datos.csv
+data/ajustes.json
+
 # Datos de runtime regenerables / volátiles
 data/tmp/
 data/comodines.json
