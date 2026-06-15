@@ -9,12 +9,28 @@ from num2words import num2words
 # ---------- Catálogos ----------
 
 PLAN_A_CARRERA = {
+    "ICB": "LICENCIATURA EN INGENIERIA EN CIBERSEGURIDAD",
     "ICO": "LICENCIATURA DE INGENIERIA EN COMPUTACION",
     "IME": "LICENCIATURA DE INGENIERIA MECANICA",
     "IPI": "LICENCIATURA DE INGENIERO EN PRODUCCION INDUSTRIAL",
     "IPL": "LICENCIATURA DE INGENIERO EN PLASTICOS",
+    "IPLS": "LICENCIATURA DE INGENIERO EN PLASTICOS",
     "ISW": "LICENCIATURA DE INGENIERO EN SOFTWARE",
     "LSD": "LICENCIATURA EN SEGURIDAD CIUDADANA",
+}
+
+# Total de semestres por plan de estudios (metadato; la plantilla actual no lo
+# imprime). Se llavea por el código COMPLETO del plan —con sufijo— porque la
+# reestructuración baja la duración SIN cambiar el prefijo: un alumno de
+# IPI-F26 cursa 9 semestres, pero IPI-F19 sigue durando 10. Cualquier plan que
+# no esté aquí se asume de 10 semestres (ver semestres_totales).
+SEMESTRES_TOTALES_DEFAULT = 10
+
+PLAN_A_SEMESTRES_TOTALES = {
+    "ICB-F25": 8,
+    "IPI-F26": 9,
+    "IPLS-F26": 9,
+    "ISW-F26": 9,
 }
 
 ORDINALES = {
@@ -79,6 +95,19 @@ def plan_a_carrera_full(plan: str) -> str:
         return ""
     codigo = plan.split("-", 1)[0].strip().upper()
     return PLAN_A_CARRERA.get(codigo, plan)
+
+
+def semestres_totales(plan: str) -> int:
+    """Total de semestres del plan de estudios.
+
+    'IPI-F26' → 9, 'ICB-F25' → 8. Cualquier plan no reestructurado (incluido
+    el mismo prefijo en su versión anterior, p. ej. 'IPI-F19') dura 10.
+    Es metadato: la plantilla actual no imprime este dato.
+    """
+    if not plan:
+        return SEMESTRES_TOTALES_DEFAULT
+    codigo = plan.strip().upper()
+    return PLAN_A_SEMESTRES_TOTALES.get(codigo, SEMESTRES_TOTALES_DEFAULT)
 
 
 # ---------- Periodos ----------

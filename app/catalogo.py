@@ -43,6 +43,7 @@ def _derivar_well_known(alumno: dict, ajustes: dict) -> dict:
     """
     per_actual = ajustes.get("periodo_actual", "")
     per_inicio = str(alumno.get("PerInicio", "")).strip()
+    plan = str(alumno.get("Plan", ""))
 
     semestre_num = 0
     if per_actual and per_inicio:
@@ -70,8 +71,10 @@ def _derivar_well_known(alumno: dict, ajustes: dict) -> dict:
     return {
         "NOMBRE_COMPLETO": {"valor": derivar.formato_nombre(str(alumno.get("NombreAlumno", "")))},
         "CUENTA": {"valor": str(alumno.get("Cuenta", ""))},
-        "CARRERA_FULL": {"valor": derivar.plan_a_carrera_full(str(alumno.get("Plan", "")))},
+        "CARRERA_FULL": {"valor": derivar.plan_a_carrera_full(plan)},
         "SEMESTRE_TEXTO": {"valor": derivar.numero_a_ordinal_texto(semestre_num)},
+        # Total de semestres que dura el plan (metadato del catálogo de carreras).
+        "SEMESTRES_TOTALES": {"valor": str(derivar.semestres_totales(plan))},
         "PERIODO_INICIO": fecha_pack(fi, derivar.fecha_a_texto_corto),
         "PERIODO_FIN": fecha_pack(ff, derivar.fecha_a_texto_corto),
         "FECHA_EXPEDICION": fecha_pack(hoy, derivar.fecha_a_texto_largo),
@@ -104,6 +107,7 @@ ETIQUETAS: dict[str, dict] = {
     "CUENTA":           {"label": "Número de cuenta",         "tipo": TEXT},
     "CARRERA_FULL":     {"label": "Carrera (texto largo)",    "tipo": TEXT},
     "SEMESTRE_TEXTO":   {"label": "Semestre (en letra)",      "tipo": TEXT},
+    "SEMESTRES_TOTALES":{"label": "Total de semestres del plan", "tipo": TEXT},
     "PERIODO_INICIO":   {"label": "Inicio del periodo",       "tipo": DATE_CORTO},
     "PERIODO_FIN":      {"label": "Fin del periodo",          "tipo": DATE_CORTO},
     "FECHA_EXPEDICION": {"label": "Fecha de expedición",      "tipo": DATE_LARGO},
