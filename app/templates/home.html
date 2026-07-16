@@ -34,12 +34,37 @@
     {% if request.query_params.get("error") == "alumno_no_encontrado" %}
       <div class="note note-error">
         <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
-        <span>No se encontró un alumno con la cuenta <strong>{{ request.query_params.get("cuenta") }}</strong>.</span>
+        <span>No se encontró un alumno con la cuenta <strong>{{ request.query_params.get("cuenta") }}</strong>. También puedes buscar escribiendo el nombre.</span>
       </div>
     {% elif request.query_params.get("error") == "plantilla_no_encontrada" %}
       <div class="note note-error">
         <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
         <span>La plantilla seleccionada ya no existe.</span>
+      </div>
+    {% endif %}
+
+    {% if q_nombre %}
+      <div class="card">
+        <h2>
+          <svg viewBox="0 0 24 24"><path d="M10 2a8 8 0 105.3 14l5.4 5.4 1.4-1.4-5.4-5.4A8 8 0 0010 2zm0 2a6 6 0 110 12 6 6 0 010-12z"/></svg>
+          Resultados para «{{ q_nombre }}»
+        </h2>
+        {% if resultados %}
+          {% for r in resultados %}
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 0; border-top:1px solid var(--outline-variant);">
+              <div>
+                <div style="font-weight:600;">{{ r.NombreAlumno }}</div>
+                <div style="font-size:13px; color:var(--on-surface-variant);">Cuenta {{ r.Cuenta }} · {{ r.Plan }}</div>
+              </div>
+              <a class="btn btn-tonal" href="/generar?cuenta={{ r.Cuenta }}&plantilla={{ request.query_params.get('plantilla', '') }}">Generar</a>
+            </div>
+          {% endfor %}
+          {% if resultados|length >= 20 %}
+            <p style="font-size:13px; color:var(--on-surface-variant); margin-top:10px;">Se muestran los primeros 20. Escribe más palabras del nombre para afinar.</p>
+          {% endif %}
+        {% else %}
+          <p>Ningún alumno coincide con ese nombre. Revisa la ortografía (los acentos no importan).</p>
+        {% endif %}
       </div>
     {% endif %}
 
@@ -50,7 +75,13 @@
           <svg viewBox="0 0 24 24"><path d="M7 2a1 1 0 011 1v1h8V3a1 1 0 112 0v1h1a2 2 0 012 2v13a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2h1V3a1 1 0 011-1zm12 7H5v10h14V9z"/></svg>
           Periodo activo
         </h2>
-        <p>Define el periodo en curso (ej. <code>2026A</code>). Se usa para calcular el semestre del alumno.</p>
+        {% if request.query_params.get("error_ajustes") %}
+          <div class="note note-error" style="margin-bottom: 12px;">
+            <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+            <span>{{ request.query_params.get("error_ajustes") }}</span>
+          </div>
+        {% endif %}
+        <p>Se configura <strong>una vez por semestre</strong>. El periodo (ej. <code>2026A</code>) se usa para calcular el semestre del alumno; las fechas prellenan «Inicio/Fin del periodo» en todas las constancias.</p>
         <form action="/ajustes" method="post">
           <div class="field">
             <label for="periodo_actual">Periodo</label>
@@ -58,6 +89,19 @@
                    value="{{ ajustes.get('periodo_actual', '') }}"
                    placeholder="2026A" pattern="[0-9]{4}[ABab]" required>
           </div>
+          <div class="field" style="display:flex; gap:10px;">
+            <div style="flex:1;">
+              <label for="periodo_inicio">Inicio del periodo</label>
+              <input id="periodo_inicio" type="date" name="periodo_inicio"
+                     value="{{ ajustes.get('periodo_fecha_inicio', '') }}">
+            </div>
+            <div style="flex:1;">
+              <label for="periodo_fin">Fin del periodo</label>
+              <input id="periodo_fin" type="date" name="periodo_fin"
+                     value="{{ ajustes.get('periodo_fecha_fin', '') }}">
+            </div>
+          </div>
+          <p style="font-size:12px; color:var(--on-surface-variant); margin:-4px 0 12px;">Si las dejas vacías se usan las fechas típicas (02 de febrero / 02 de agosto). Siempre puedes ajustarlas en una constancia concreta.</p>
           <div class="actions">
             <button type="submit">Guardar periodo</button>
           </div>
@@ -92,6 +136,7 @@
     </div>
     {% endif %}
 
+    {% set plantillas_listas = plantillas | selectattr("info") | list %}
     <div class="card" id="tour-generar">
       <h2>
         <svg viewBox="0 0 24 24"><path d="M10 2a8 8 0 105.3 14l5.4 5.4 1.4-1.4-5.4-5.4A8 8 0 0010 2zm0 2a6 6 0 110 12 6 6 0 010-12z"/></svg>
@@ -99,37 +144,69 @@
       </h2>
       {% if not datos %}
         <p>{% if es_admin %}Sube primero un archivo de datos.{% else %}No hay datos cargados. Pídele al administrador que los suba.{% endif %}</p>
-      {% elif not plantilla %}
+      {% elif not plantillas_listas %}
         <p>{% if es_admin %}No hay plantilla cargada. <a href="/plantillas">Sube una</a> antes de generar.{% else %}No hay plantilla cargada. Pídele al administrador que la suba.{% endif %}</p>
       {% else %}
         <form action="/buscar" method="post">
           <div class="field">
-            <label for="cuenta">Número de cuenta</label>
-            <input id="cuenta" type="text" name="cuenta" placeholder="Ej. 2014694" inputmode="numeric" required autofocus>
+            <label for="cuenta">Número de cuenta o nombre</label>
+            <input id="cuenta" type="text" name="cuenta" placeholder="Ej. 2014694 o «perez juan»" required autofocus
+                   value="{{ q_nombre }}">
           </div>
+          {% if plantillas_listas|length > 1 %}
+          <div class="field">
+            <label for="selPlantilla">Tipo de constancia</label>
+            <select id="selPlantilla" name="plantilla">
+              {% for it in plantillas_listas %}
+                <option value="{{ it.slug }}" {% if request.query_params.get('plantilla') == it.slug %}selected{% endif %}>{{ it.nombre }}</option>
+              {% endfor %}
+            </select>
+          </div>
+          {% else %}
+            <input type="hidden" name="plantilla" value="{{ plantillas_listas[0].slug }}">
+          {% endif %}
           <div class="actions">
             <button type="submit">
               <svg viewBox="0 0 24 24"><path d="M10 2a8 8 0 105.3 14l5.4 5.4 1.4-1.4-5.4-5.4A8 8 0 0010 2zm0 2a6 6 0 110 12 6 6 0 010-12z"/></svg>
               Buscar y continuar
             </button>
+            <a class="btn btn-tonal" href="/lote" id="tour-lote">
+              <svg viewBox="0 0 24 24"><path d="M4 6h16v2H4V6zm0 5h16v2H4v-2zm0 5h10v2H4v-2z"/></svg>
+              Generar por lotes
+            </a>
           </div>
         </form>
       {% endif %}
     </div>
 
     {% if es_admin %}
-    <div class="card" id="tour-plantilla">
-      <h2>
-        <svg viewBox="0 0 24 24"><path d="M4 4a2 2 0 012-2h8l6 6v12a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm9 1v5h5l-5-5z"/></svg>
-        Plantilla universal
-      </h2>
-      {% if plantilla %}
-        <p>{{ plantilla.placeholders|length }} placeholders detectados · cargada {{ plantilla.fecha_carga }}</p>
-      {% else %}
-        <p>No hay plantilla cargada todavía.</p>
-      {% endif %}
-      <div class="actions">
-        <a class="btn btn-tonal" href="/plantillas">Gestionar plantilla</a>
+    <div class="grid">
+      <div class="card" id="tour-plantilla">
+        <h2>
+          <svg viewBox="0 0 24 24"><path d="M4 4a2 2 0 012-2h8l6 6v12a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm9 1v5h5l-5-5z"/></svg>
+          Plantillas
+        </h2>
+        {% if plantillas_listas %}
+          <p>{{ plantillas_listas|length }} plantilla{{ "s" if plantillas_listas|length != 1 }} activa{{ "s" if plantillas_listas|length != 1 }}:
+            {% for it in plantillas_listas %}<strong>{{ it.nombre }}</strong>{% if not loop.last %} · {% endif %}{% endfor %}
+          </p>
+        {% else %}
+          <p>No hay plantilla cargada todavía.</p>
+        {% endif %}
+        <div class="actions">
+          <a class="btn btn-tonal" href="/plantillas">Gestionar plantillas</a>
+        </div>
+      </div>
+
+      <div class="card" id="tour-carreras">
+        <h2>
+          <svg viewBox="0 0 24 24"><path d="M12 3L1 9l11 6 9-4.9V17h2V9L12 3zm-7 9.6V17c0 1.7 3.1 3 7 3s7-1.3 7-3v-4.4l-7 3.8-7-3.8z"/></svg>
+          Carreras
+        </h2>
+        <p>Catálogo de carreras y duración de planes. Aquí das de alta una carrera nueva sin tocar código.</p>
+        <div class="actions">
+          <a class="btn btn-tonal" href="/carreras">Gestionar carreras</a>
+        </div>
       </div>
     </div>
     {% endif %}
@@ -139,11 +216,15 @@
     window.TOUR = {
       key: "home-{% if es_admin %}admin{% else %}invitado{% endif %}",
       steps: [
-        { sel: ".chip", title: "Tu sesión", text: "Aquí ves con qué rol entraste: Administrador (puede subir datos y plantilla) o Invitado (solo genera)." },
-        { sel: "#cuenta", title: "Generar una constancia", text: "Escribe el número de cuenta del alumno y pulsa «Buscar y continuar». Te llevará al formulario con todo prellenado." },
-        { sel: "#periodo_actual", title: "Periodo activo", text: "Define el periodo en curso (ej. 2026A). Se usa para calcular automáticamente el semestre del alumno." },
+        { sel: ".chip", title: "Tu sesión", text: "Aquí ves con qué rol entraste: Administrador (puede subir datos y plantillas) o Invitado (solo genera)." },
+        { sel: "#cuenta", title: "Generar una constancia", text: "Escribe el número de cuenta o parte del nombre del alumno y pulsa «Buscar y continuar»." },
+        { sel: "#selPlantilla", title: "Tipo de constancia", text: "Si hay varias plantillas (general, inglés, prácticas…), elige aquí cuál usar." },
+        { sel: "#tour-lote", title: "Lotes", text: "¿Necesitas muchas constancias? Pega una lista de cuentas y descarga todas en un ZIP." },
+        { sel: "#periodo_actual", title: "Periodo activo", text: "Define el periodo en curso (ej. 2026A) una vez por semestre. Con él se calcula automáticamente el semestre del alumno (comparándolo con su periodo de ingreso)." },
+        { sel: "#periodo_inicio", title: "Fechas del periodo", text: "Guarda aquí las fechas reales de inicio y fin del semestre según el calendario escolar: todas las constancias saldrán prellenadas con ellas." },
         { sel: "#tour-datos", title: "Datos de alumnos", text: "Consulta y reemplaza aquí la base de datos (.xls, .xlsx o .csv). El archivo se conserva hasta que subas otro." },
-        { sel: "#tour-plantilla", title: "Plantilla universal", text: "Gestiona el documento .docx con los placeholders [[CAMPO]]. Lo que pongas ahí define qué campos aparecen al generar." },
+        { sel: "#tour-plantilla", title: "Plantillas", text: "Gestiona los documentos .docx con placeholders [[CAMPO]]. Puedes tener varias: constancia general, en inglés, de prácticas…" },
+        { sel: "#tour-carreras", title: "Carreras", text: "Cuando abran una carrera nueva o cambie la duración de un plan, dala de alta aquí. Sin programador." },
         { sel: "[data-tour]", title: "¿Repasar el tutorial?", text: "Cuando quieras volver a ver esta guía, pulsa este botón de ayuda." }
       ]
     };

@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Generar por lotes</title>
+  <link rel="stylesheet" href="/static/styles.css?v=5">
+  <style>
+    .radio-row { display: flex; gap: 10px; flex-wrap: wrap; }
+    .radio-row label {
+      display: flex; align-items: center; gap: 8px; cursor: pointer;
+      padding: 9px 16px; border: 1.5px solid var(--outline-variant);
+      border-radius: var(--radius-pill); color: var(--on-surface);
+      font-weight: 500; font-size: 14px;
+    }
+    .radio-row input { accent-color: var(--primary); width: 18px; height: 18px; }
+    .date-row { display: flex; gap: 10px; align-items: flex-end; }
+    .date-row > div { flex: 1; }
+    .date-row .small { font-size: 12px; color: var(--on-surface-variant); margin-bottom: 6px; font-weight: 600; }
+    .check-row { display: flex; align-items: center; gap: 10px; padding: 6px 0; font-size: 14px; }
+    .check-row input { accent-color: var(--primary); width: 18px; height: 18px; }
+    .res-row { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-top: 1px solid var(--outline-variant); font-size: 14px; }
+    .res-row .cta { width: 90px; font-variant-numeric: tabular-nums; }
+    .res-row .nom { flex: 1; }
+    .badge-ok { background: var(--secondary-container); color: var(--on-secondary-container); padding: 2px 10px; border-radius: var(--radius-pill); font-size: 12px; font-weight: 600; }
+    .badge-warn { background: var(--error-container); color: var(--on-error-container); padding: 2px 10px; border-radius: var(--radius-pill); font-size: 12px; font-weight: 600; }
+    .comodin-bar { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
+    .comodin-bar select { flex: 1; }
+    .field-opcional .field-tag {
+      font-size: 11px; font-weight: 600; color: var(--on-secondary-container);
+      background: var(--secondary-container); padding: 1px 8px; border-radius: var(--radius-pill);
+    }
+  </style>
+</head>
+<body>
+  <div class="page" style="max-width: 860px;">
+    <header class="header">
+      <div class="brand">
+        <h1>Generar por lotes</h1>
+        <p>Pega una lista de cuentas y descarga todas las constancias en un ZIP.</p>
+      </div>
+      <div class="appbar-actions">
+        <a class="btn-ghost" href="/">
+          <svg viewBox="0 0 24 24"><path d="M15.4 7.4L14 6l-6 6 6 6 1.4-1.4-4.6-4.6 4.6-4.6z"/></svg>
+          Volver
+        </a>
+        <button class="icon-btn" type="button" data-tour title="Ver tutorial" aria-label="Ver tutorial">
+          <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm0 16.5a1.25 1.25 0 110-2.5 1.25 1.25 0 010 2.5zm1.8-6.3c-.7.5-.9.8-.9 1.4v.4h-1.8v-.5c0-1.2.5-1.9 1.4-2.5.7-.5 1-.8 1-1.4 0-.7-.5-1.1-1.3-1.1-.8 0-1.3.4-1.7 1.1l-1.5-.9C9 7.9 10.1 7.2 11.6 7.2c1.9 0 3.2 1 3.2 2.7 0 1.1-.5 1.7-1.6 2.3z"/></svg>
+        </button>
+        <button id="themeToggle" class="icon-btn" type="button"></button>
+      </div>
+    </header>
+
+    {% if resultado %}
+      <div class="card">
+        <h2>
+          <svg viewBox="0 0 24 24"><path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg>
+          Resultado del lote
+        </h2>
+        <p><strong>{{ resultado.generadas }}</strong> constancia{{ "s" if resultado.generadas != 1 }} generada{{ "s" if resultado.generadas != 1 }} de {{ resultado.resultados|length }} cuenta{{ "s" if resultado.resultados|length != 1 }}.</p>
+        {% if resultado.zip %}
+          <div class="actions" style="margin-bottom: 12px;">
+            <a class="btn" href="{{ resultado.zip }}">
+              <svg viewBox="0 0 24 24"><path d="M5 20h14v-2H5v2zM12 2v12.2l4-4 1.4 1.4L12 17 6.6 11.6 8 10.2l4 4V2h0z"/></svg>
+              Descargar ZIP ({{ resultado.formato }})
+            </a>
+            <a class="btn btn-tonal" href="/lote?plantilla={{ plantilla_slug }}">Nuevo lote</a>
+          </div>
+        {% endif %}
+        {% for r in resultado.resultados %}
+          <div class="res-row">
+            <span class="cta">{{ r.cuenta }}</span>
+            <span class="nom">{{ r.nombre or "—" }}</span>
+            {% if r.estado == "ok" %}
+              <span class="badge-ok">generada</span>
+            {% elif r.estado == "revisar" %}
+              <span class="badge-warn" title="Quedaron placeholders sin dato: {{ r.detalle }}">revisar: {{ r.detalle }}</span>
+            {% elif r.estado == "no_encontrado" %}
+              <span class="badge-warn">cuenta no encontrada</span>
+            {% else %}
+              <span class="badge-warn" title="{{ r.detalle }}">error al convertir a PDF</span>
+            {% endif %}
+          </div>
+        {% endfor %}
+        {% if resultado.resultados | selectattr("estado", "equalto", "revisar") | list %}
+          <p style="font-size:13px; color:var(--on-surface-variant); margin-top:10px;">
+            Las constancias marcadas «revisar» sí van en el ZIP, pero conservan visibles los placeholders sin dato
+            (por ejemplo el género cuando el Excel no trae columna Sexo) — ábrelas en Word para completarlas, o
+            genera esas cuentas de forma individual.
+          </p>
+        {% endif %}
+      </div>
+    {% else %}
+
+    <form action="/lote/generar" method="post" id="formLote">
+      <input type="hidden" name="plantilla" value="{{ plantilla_slug }}">
+
+      <div class="card">
+        <h2>
+          <svg viewBox="0 0 24 24"><path d="M4 6h16v2H4V6zm0 5h16v2H4v-2zm0 5h10v2H4v-2z"/></svg>
+          Cuentas
+        </h2>
+        {% set plantillas_listas = plantillas | selectattr("info") | list %}
+        {% if plantillas_listas|length > 1 %}
+        <div class="field">
+          <label for="selPlantilla">Tipo de constancia</label>
+          <select id="selPlantilla" onchange="location.href='/lote?plantilla=' + encodeURIComponent(this.value)">
+            {% for it in plantillas_listas %}
+              <option value="{{ it.slug }}" {% if plantilla_slug == it.slug %}selected{% endif %}>{{ it.nombre }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        {% endif %}
+        <div class="field">
+          <label for="cuentas">Números de cuenta (uno por línea, o separados por comas; máx. 200)</label>
+          <textarea id="cuentas" name="cuentas" rows="6" placeholder="2014694&#10;2015823&#10;2016911" required></textarea>
+        </div>
+        <div class="field">
+          <label>Formato de salida</label>
+          <div class="radio-row">
+            <label><input type="radio" name="formato" value="docx" checked><span>Word (.docx) — rápido</span></label>
+            <label><input type="radio" name="formato" value="pdf"><span>PDF — tarda unos segundos por alumno</span></label>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>
+          <svg viewBox="0 0 24 24"><path d="M3 5a2 2 0 012-2h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5zm4 3h10v2H7V8zm0 4h10v2H7v-2zm0 4h6v2H7v-2z"/></svg>
+          Datos compartidos del lote
+        </h2>
+        <p style="font-size:13px; color:var(--on-surface-variant);">Nombre, carrera, semestre, promedios y género se derivan solos por alumno. Esto aplica igual para todos:</p>
+
+        {% for c in campos %}
+          <div class="field {% if c.opcional %}field-opcional{% endif %}">
+            <label>{{ c.label }}{% if c.opcional %} <span class="field-tag">opcional — vacío = se omite</span>{% endif %}{% if c.de_plantilla %} <span class="field-tag" title="Campo detectado automáticamente en la plantilla [[{{ c.name }}]]">plantilla</span>{% endif %}</label>
+            {% if c.tipo == "textarea" %}
+              {% if c.name == "LINEA_LIBRE" %}
+                <div class="comodin-bar">
+                  <select id="comodinSelector"><option value="">— Insertar comodín —</option></select>
+                </div>
+              {% endif %}
+              <textarea name="campo_{{ c.name }}" rows="2">{{ c.valor }}</textarea>
+            {% elif c.tipo == "date_corto" or c.tipo == "date_largo" %}
+              <input type="date" name="fecha_{{ c.name }}" value="{{ c.iso }}">
+            {% elif c.tipo == "date_rango" %}
+              <div class="date-row">
+                <div>
+                  <div class="small">Inicio (vacío = se omite)</div>
+                  <input type="date" name="fecha_VAC_INICIO" value="{{ c.iso_inicio }}">
+                </div>
+                <div>
+                  <div class="small">Fin</div>
+                  <input type="date" name="fecha_VAC_FIN" value="{{ c.iso_fin }}">
+                </div>
+              </div>
+            {% else %}
+              <input type="text" name="campo_{{ c.name }}" value="{{ c.valor }}">
+            {% endif %}
+          </div>
+        {% endfor %}
+
+        {% if tiene_promedios %}
+        <div class="field">
+          <label>Líneas de promedio (se calculan por alumno desde el Excel)</label>
+          <div class="check-row"><input type="checkbox" id="pg" name="incluir_promedio_general"><label for="pg">Incluir promedio general (si el alumno tiene dato)</label></div>
+          <div class="check-row"><input type="checkbox" id="pu" name="incluir_promedio_ultimo"><label for="pu">Incluir promedio del último periodo (si el alumno tiene dato)</label></div>
+        </div>
+        {% endif %}
+
+        <div class="hr"></div>
+        <div class="actions">
+          <button type="submit" id="btnGenerar">
+            <svg viewBox="0 0 24 24"><path d="M5 20h14v-2H5v2zM12 2v12.2l4-4 1.4 1.4L12 17 6.6 11.6 8 10.2l4 4V2h0z"/></svg>
+            Generar lote
+          </button>
+        </div>
+      </div>
+    </form>
+    {% endif %}
+  </div>
+  <script src="/static/theme.js?v=5"></script>
+  <script>
+    const form = document.getElementById("formLote");
+    if (form) {
+      form.addEventListener("submit", () => {
+        const btn = document.getElementById("btnGenerar");
+        btn.disabled = true;
+        btn.textContent = "Generando… no cierres la página";
+      });
+
+      // Comodines para la línea libre compartida.
+      const sel = document.getElementById("comodinSelector");
+      const ta = form.querySelector('textarea[name="campo_LINEA_LIBRE"]');
+      if (sel && ta) {
+        fetch("/comodines").then(r => r.json()).then(items => {
+          for (const c of items) {
+            const opt = document.createElement("option");
+            opt.value = c.id; opt.textContent = c.titulo;
+            opt.dataset.texto = c.texto;
+            sel.appendChild(opt);
+          }
+        }).catch(() => {});
+        sel.addEventListener("change", () => {
+          const opt = sel.selectedOptions[0];
+          if (opt && opt.dataset.texto) ta.value = opt.dataset.texto;
+        });
+      }
+    }
+  </script>
+  <script>
+    window.TOUR = {
+      key: "lote",
+      steps: [
+        { sel: "#cuentas", title: "Lista de cuentas", text: "Pega aquí las cuentas de los alumnos (una por línea o separadas por comas). Máximo 200 por lote." },
+        { sel: ".radio-row", title: "Formato", text: "Word es inmediato; PDF tarda unos segundos por alumno porque cada documento se convierte individualmente." },
+        { sel: ".card:last-of-type", title: "Datos compartidos", text: "Las fechas y líneas opcionales aplican igual a todo el lote. Lo individual (nombre, carrera, semestre, género, promedios) se deriva solo del Excel." }
+      ]
+    };
+  </script>
+  <script src="/static/tour.js?v=5"></script>
+</body>
+</html>

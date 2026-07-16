@@ -56,7 +56,7 @@
   <div class="page">
     <header class="header">
       <div class="brand">
-        <h1>Constancia</h1>
+        <h1>{{ plantilla_nombre or "Constancia" }}</h1>
         <p>{{ alumno.NombreAlumno }} · cuenta {{ alumno.Cuenta }}</p>
       </div>
       <div class="appbar-actions">
@@ -70,6 +70,13 @@
         <button id="themeToggle" class="icon-btn" type="button"></button>
       </div>
     </header>
+
+    {% if not ajustes.get('periodo_actual') %}
+      <div class="note note-error">
+        <svg viewBox="0 0 24 24"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>
+        <span>No hay <strong>periodo activo</strong> configurado: el semestre y las fechas del periodo no se pueden calcular solos. Pídele al administrador que lo defina en la pantalla principal (se hace una sola vez por semestre).</span>
+      </div>
+    {% endif %}
 
     <div class="alumno-info">
       <div><b>Plan</b><span class="v">{{ alumno.Plan }}</span></div>
@@ -89,26 +96,27 @@
           </h2>
           <form id="formCampos">
             <input type="hidden" name="cuenta" value="{{ alumno.Cuenta }}">
+            <input type="hidden" name="plantilla" value="{{ plantilla_slug }}">
 
             {% for c in campos %}
               {% set incluido = (c.iso_inicio and c.iso_fin) if c.tipo == "date_rango" else (c.valor|trim != "") %}
               <div class="field {% if c.opcional %}field-opcional{% if not incluido %} field--off{% endif %}{% endif %}">
                 {% if c.opcional %}
                   <div class="field-head">
-                    <label>{{ c.label }} <span class="field-tag">opcional</span></label>
+                    <label>{{ c.label }} <span class="field-tag">opcional</span>{% if c.de_plantilla %} <span class="field-tag" title="Campo detectado automáticamente en la plantilla [[{{ c.name }}]]">plantilla</span>{% endif %}</label>
                     <label class="switch" title="Incluir u omitir esta línea en la constancia">
                       <input type="checkbox" class="opt-toggle" {% if incluido %}checked{% endif %}>
                       <span class="track"></span>
                     </label>
                   </div>
                 {% else %}
-                  <label>{{ c.label }}</label>
+                  <label>{{ c.label }}{% if c.de_plantilla %} <span class="field-tag" title="Campo detectado automáticamente en la plantilla [[{{ c.name }}]]">plantilla</span>{% endif %}</label>
                 {% endif %}
 
                 {% if c.tipo == "radio_genero" %}
                   <div class="radio-row">
-                    <label><input type="radio" name="__genero__" value="M" required><span>Masculino</span></label>
-                    <label><input type="radio" name="__genero__" value="F"><span>Femenino</span></label>
+                    <label><input type="radio" name="__genero__" value="M" required {% if c.genero == "M" %}checked{% endif %}><span>Masculino</span></label>
+                    <label><input type="radio" name="__genero__" value="F" {% if c.genero == "F" %}checked{% endif %}><span>Femenino</span></label>
                   </div>
                   <input type="hidden" name="campo_{{ c.name }}" value="">
                 {% elif c.tipo == "textarea" %}

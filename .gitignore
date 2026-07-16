@@ -15,12 +15,18 @@ desktop.ini
 
 # Datos sensibles / de usuario — NO versionar (montados como volumen)
 data/datos.csv
+data/datos.xls
 data/ajustes.json
 
 # Datos de runtime regenerables / volátiles
 data/tmp/
 data/comodines.json
+data/carreras.json
 data/plantillas/_meta.json
+data/plantillas/historial/
+data/plantillas/registro.json
+data/plantillas/*/
+data/datos.xls
 data/Constancia_*.docx
 data/preview_*.docx
 data/datos_*.csv

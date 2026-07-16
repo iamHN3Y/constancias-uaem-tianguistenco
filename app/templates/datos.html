@@ -25,6 +25,18 @@
       </div>
     </header>
 
+    {% if request.query_params.get("error") %}
+      <div class="note note-error">
+        <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+        <span>{{ request.query_params.get("error") }}</span>
+      </div>
+    {% elif request.query_params.get("ok") %}
+      <div class="note">
+        <svg viewBox="0 0 24 24"><path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg>
+        <span>Datos cargados correctamente.</span>
+      </div>
+    {% endif %}
+
     <div class="card">
       <h2>
         <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm-1 5h2v6h-2V7zm0 8h2v2h-2v-2z"/></svg>
