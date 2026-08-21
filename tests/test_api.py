@@ -1,21 +1,22 @@
 """
 Test de integración de la API completa (sin LibreOffice: solo .docx).
 
-Recorre el flujo real: login → subir plantilla(s) → subir datos → generar
-(individual y por lotes), incluyendo los escenarios de longevidad:
-comodines nuevos en la plantilla, archivos corruptos, edición directa en
-disco, historial/restauración, catálogo de carreras editable y búsqueda
-por nombre.
+Recorre el flujo real: login → subir plantilla(s) → subir datos → generar,
+incluyendo los escenarios de longevidad: comodines nuevos en la plantilla,
+archivos corruptos, edición directa en disco, historial/restauración,
+catálogo de carreras editable, búsqueda por nombre y alumnos de nuevo ingreso.
 """
 import io
 import os
 import sys
-import zipfile
 
 import pytest
 from docx import Document
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
+
+REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+EXCEL_NUEVO_INGRESO = os.path.join(REPO_ROOT, "data", "Alumnos de nuevo ingreso 26B.xlsx")
 
 
 def docx_bytes(*parrafos: str) -> bytes:
@@ -38,12 +39,14 @@ def client(tmp_path):
     originales = {
         k: getattr(m, k)
         for k in ("DATA_DIR", "PLANTILLAS_DIR", "TMP_DIR", "DATOS_CSV",
-                  "AJUSTES_FILE", "CARRERAS_FILE", "plantillas", "carreras")
+                  "NUEVO_INGRESO_CSV", "AJUSTES_FILE", "CARRERAS_FILE",
+                  "plantillas", "carreras")
     }
     m.DATA_DIR = workdir
     m.PLANTILLAS_DIR = os.path.join(workdir, "plantillas")
     m.TMP_DIR = os.path.join(workdir, "tmp")
     m.DATOS_CSV = os.path.join(workdir, "datos.csv")
+    m.NUEVO_INGRESO_CSV = os.path.join(workdir, "nuevo_ingreso.csv")
     m.AJUSTES_FILE = os.path.join(workdir, "ajustes.json")
     m.CARRERAS_FILE = os.path.join(workdir, "carreras.json")
     os.makedirs(m.TMP_DIR, exist_ok=True)
@@ -124,8 +127,8 @@ def test_flujo_completo(client):
 
 
 def test_ajustes_periodo_con_fechas(client):
-    """El admin guarda periodo + fechas una vez; el formulario y el lote
-    salen prellenados con ellas, y el semestre se calcula solo."""
+    """El admin guarda periodo + fechas una vez; el formulario sale
+    prellenado con ellas, y el semestre se calcula solo."""
     _crear_plantilla(client, "General", docx_bytes(
         "[[SEMESTRE_TEXTO]] semestre, del [[PERIODO_INICIO]] al [[PERIODO_FIN]]",
     ))
@@ -144,11 +147,6 @@ def test_ajustes_periodo_con_fechas(client):
     assert 'value="2026-02-09"' in r.text
     assert 'value="2026-07-24"' in r.text
     assert 'value="sexto"' in r.text
-
-    # El lote hereda las mismas fechas.
-    r = client.get("/lote")
-    assert 'value="2026-02-09"' in r.text
-    assert 'value="2026-07-24"' in r.text
 
 
 def test_ajustes_rechaza_fechas_invertidas(client):
@@ -172,49 +170,6 @@ def test_busqueda_por_nombre(client):
 
     r = client.post("/buscar", data={"cuenta": "nadie asi"}, follow_redirects=True)
     assert "Ningún alumno coincide" in r.text
-
-
-def test_lote_docx(client):
-    _crear_plantilla(client, "General", docx_bytes(
-        "[[ARTICULO]] [[NOMBRE_COMPLETO]], cuenta [[CUENTA]]",
-        "[[PROMEDIO_GENERAL_LINEA]]",
-    ))
-    _subir_datos(client)
-
-    r = client.post("/lote/generar", data={
-        "plantilla": "general",
-        "formato": "docx",
-        "cuentas": "2014694\n2015000, 9999999",
-        "incluir_promedio_general": "on",
-    })
-    assert r.status_code == 200
-    assert "Resultado del lote" in r.text
-    assert "<strong>2</strong>" in r.text  # 2 generadas de 3 cuentas
-    assert "cuenta no encontrada" in r.text
-
-    # El ZIP existe y trae los dos .docx correctos.
-    inicio = r.text.index("/lote/zip/")
-    url_zip = r.text[inicio:r.text.index('"', inicio)]
-    rz = client.get(url_zip)
-    assert rz.status_code == 200
-    zf = zipfile.ZipFile(io.BytesIO(rz.content))
-    assert sorted(zf.namelist()) == ["Constancia_2014694.docx", "Constancia_2015000.docx"]
-
-    doc = Document(io.BytesIO(zf.read("Constancia_2015000.docx")))
-    textos = "\n".join(p.text for p in doc.paragraphs)
-    assert "la alumna GARCÍA ANA MARÍA" in textos   # género desde Sexo=F
-    assert "9.2" in textos                           # promedio incluido
-
-
-def test_lote_sin_genero_marca_revisar(client):
-    _crear_plantilla(client, "General", docx_bytes("[[ARTICULO]] [[NOMBRE_COMPLETO]]"))
-    _subir_datos(client)
-    r = client.post("/lote/generar", data={
-        "plantilla": "general", "formato": "docx", "cuentas": "2016000",
-    })
-    # Sexo vacío → la constancia se genera pero se marca para revisión y
-    # el placeholder queda visible.
-    assert "revisar" in r.text and "ARTICULO" in r.text
 
 
 def test_multiples_plantillas_y_seleccion(client):
@@ -318,3 +273,137 @@ def test_invitado_no_puede_administrar(client):
     r = client.post("/plantillas/crear", data={"nombre": "Y"},
                     files={"archivo": ("t.docx", docx_bytes("[[X]]"))}, follow_redirects=False)
     assert r.headers["location"] == "/"
+
+
+# ---------- Alumnos de nuevo ingreso ----------
+
+def _subir_nuevo_ingreso(client, contenido: bytes, nombre="Alumnos de nuevo ingreso 26B.xlsx"):
+    return client.post("/datos/nuevo-ingreso", files={"archivo": (nombre, contenido)},
+                       follow_redirects=False)
+
+
+@pytest.mark.skipif(not os.path.exists(EXCEL_NUEVO_INGRESO), reason="requiere el xlsx real (gitignorado)")
+def test_nuevo_ingreso_importa_excel_real(client):
+    m = client.modulo
+    with open(EXCEL_NUEVO_INGRESO, "rb") as f:
+        contenido = f.read()
+
+    r = _subir_nuevo_ingreso(client, contenido)
+    assert "ok=1" in r.headers["location"]
+
+    df = m.leer_nuevo_ingreso()
+    assert len(df) == 633  # todas las filas del Excel, sin fila de encabezado real
+    assert list(df.columns) == ["Cuenta", "NombreAlumno", "Plan", "PerInicio"]
+
+    meta = m.ni_meta()
+    assert meta["filas"] == 633
+    assert meta["filename"] == "Alumnos de nuevo ingreso 26B.xlsx"
+    assert meta["periodo"] == "2026B"
+
+    # Una cuenta cualquiera del archivo se compone bien: "PATERNO MATERNO / NOMBRES".
+    fila = df.loc[df["Cuenta"] == "2671789"].iloc[0]
+    assert fila["NombreAlumno"] == "ANTONIO MORALES / VANESSA"
+    assert fila["Plan"] == "ICB-F25"
+    assert fila["PerInicio"] == "2026B"
+
+
+@pytest.mark.skipif(not os.path.exists(EXCEL_NUEVO_INGRESO), reason="requiere el xlsx real (gitignorado)")
+def test_nuevo_ingreso_nombre_con_materno_vacio(client):
+    m = client.modulo
+    with open(EXCEL_NUEVO_INGRESO, "rb") as f:
+        _subir_nuevo_ingreso(client, f.read())
+
+    df = m.leer_nuevo_ingreso()
+    fila = df.loc[df["Cuenta"] == "2671606"].iloc[0]
+    # Sin apellido materno: no debe quedar doble espacio ni un espacio suelto.
+    assert fila["NombreAlumno"] == "GUTIERREZ / ALEXANDRA GUADALUPE"
+
+
+def test_padron_principal_tiene_prioridad_sobre_nuevo_ingreso(client):
+    m = client.modulo
+    _crear_plantilla(client, "General", docx_bytes("[[NOMBRE_COMPLETO]]"))
+    _subir_datos(client)  # incluye la cuenta 2014694 = PÉREZ / JUAN
+
+    ni_csv = (
+        "Cuenta,NombreAlumno,Plan,PerInicio\n"
+        "2014694,OTRO NOMBRE / DUPLICADO,ICO-F26,2026B\n"
+        "9000001,NUEVO / ALUMNO,ICO-F26,2026B\n"
+    )
+    with open(m.NUEVO_INGRESO_CSV, "w", encoding="utf-8") as f:
+        f.write(ni_csv)
+
+    alumno = m.buscar_alumno("2014694")
+    assert alumno["NombreAlumno"] == "PÉREZ / JUAN"
+    assert "_origen" not in alumno
+
+    # Cuenta que solo existe en nuevo ingreso: se marca su origen.
+    alumno_ni = m.buscar_alumno("9000001")
+    assert alumno_ni["NombreAlumno"] == "NUEVO / ALUMNO"
+    assert alumno_ni["_origen"] == "nuevo_ingreso"
+
+    # Cuenta que no existe en ningún lado.
+    assert m.buscar_alumno("0000000") is None
+
+
+def test_purga_automatica_al_subir_padron_nuevo(client):
+    m = client.modulo
+    ni_csv = (
+        "Cuenta,NombreAlumno,Plan,PerInicio\n"
+        "2014694,PÉREZ / JUAN,ICO-F26,2026B\n"
+        "9000002,OTRO / ALUMNO,ICO-F26,2026B\n"
+    )
+    with open(m.NUEVO_INGRESO_CSV, "w", encoding="utf-8") as f:
+        f.write(ni_csv)
+    aj = m.cargar_ajustes()
+    aj["ni_filas"] = 2
+    m.guardar_ajustes(aj)
+
+    _crear_plantilla(client, "General", docx_bytes("[[NOMBRE_COMPLETO]]"))
+    _subir_datos(client)  # el padrón trae la cuenta 2014694
+
+    df = m.leer_nuevo_ingreso()
+    assert "2014694" not in set(df["Cuenta"])
+    assert "9000002" in set(df["Cuenta"])
+    assert m.ni_meta()["filas"] == 1
+
+
+def test_buscar_por_nombre_no_duplica(client):
+    m = client.modulo
+    _crear_plantilla(client, "General", docx_bytes("[[NOMBRE_COMPLETO]]"))
+    _subir_datos(client)  # 2014694 = PÉREZ / JUAN
+
+    ni_csv = (
+        "Cuenta,NombreAlumno,Plan,PerInicio\n"
+        "2014694,PÉREZ / JUAN,ICO-F26,2026B\n"
+        "9000003,PÉREZ / OTRO,ICO-F26,2026B\n"
+    )
+    with open(m.NUEVO_INGRESO_CSV, "w", encoding="utf-8") as f:
+        f.write(ni_csv)
+
+    resultados = m.buscar_por_nombre("perez")
+    cuentas = [r["Cuenta"] for r in resultados]
+    assert cuentas.count("2014694") == 1  # no se repite aunque esté en ambas fuentes
+    assert "9000003" in cuentas
+
+
+def test_nuevo_ingreso_eliminar(client):
+    m = client.modulo
+    with open(m.NUEVO_INGRESO_CSV, "w", encoding="utf-8") as f:
+        f.write("Cuenta,NombreAlumno,Plan,PerInicio\n9000004,X / Y,ICO-F26,2026B\n")
+    aj = m.cargar_ajustes()
+    aj.update({"ni_filename": "x.xlsx", "ni_fecha_carga": "hoy", "ni_filas": 1, "ni_periodo": "2026B"})
+    m.guardar_ajustes(aj)
+
+    r = client.post("/datos/nuevo-ingreso/eliminar", follow_redirects=False)
+    assert "ok=1" in r.headers["location"]
+    assert m.ni_meta() is None
+    assert not os.path.exists(m.NUEVO_INGRESO_CSV)
+
+
+def test_nuevo_ingreso_rechaza_columnas_incorrectas(client):
+    import pandas as pd
+
+    buf = io.BytesIO()
+    pd.DataFrame([[1, 2, 3], [4, 5, 6]]).to_excel(buf, index=False, header=False)
+    r = _subir_nuevo_ingreso(client, buf.getvalue())
+    assert "error=" in r.headers["location"]

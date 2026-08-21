@@ -16,7 +16,9 @@ desktop.ini
 # Datos sensibles / de usuario — NO versionar (montados como volumen)
 data/datos.csv
 data/datos.xls
+data/nuevo_ingreso.csv
 data/ajustes.json
+data/Alumnos de nuevo ingreso 26B.xlsx
 
 # Datos de runtime regenerables / volátiles
 data/tmp/

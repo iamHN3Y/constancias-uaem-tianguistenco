@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Generar — {{ alumno.NombreAlumno }}</title>
-  <link rel="stylesheet" href="/static/styles.css?v=5">
+  <link rel="stylesheet" href="/static/styles.css?v=10">
   <style>
     .page { max-width: 1600px; }
     .layout { display: grid; grid-template-columns: 400px 1fr; gap: 16px; align-items: start; }
@@ -29,10 +29,44 @@
     .comodin-bar { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
     .comodin-bar select { flex: 1; }
 
-    .pdf-frame {
+    .pdf-frame-wrap {
+      position: relative;
       width: 100%; height: calc(100vh - 150px); min-height: 720px;
+      border-radius: var(--radius-sm);
+      transition: box-shadow var(--dur-slow) var(--ease-emph);
+    }
+    .pdf-frame-wrap.pdf-frame-wrap--cargando {
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--secondary) 45%, transparent);
+    }
+    .pdf-frame {
+      width: 100%; height: 100%;
       border: 1px solid var(--outline-variant); border-radius: var(--radius-sm);
       background: var(--surface);
+      opacity: 1;
+      transition: opacity var(--dur-base) var(--ease-emph);
+    }
+    .pdf-frame--cargando { opacity: .35; }
+    .pdf-skeleton {
+      position: absolute;
+      inset: 0;
+      border-radius: var(--radius-sm);
+      display: none;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 24px;
+      pointer-events: none;
+    }
+    .pdf-skeleton.visible { display: flex; }
+    .pdf-skeleton span {
+      background: var(--surface-1);
+      border: 1px solid var(--outline-variant);
+      border-radius: var(--radius-pill);
+      padding: 8px 18px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--on-surface-variant);
+      box-shadow: var(--elev-1);
     }
 
     .field-opcional .field-tag {
@@ -78,7 +112,7 @@
       </div>
     {% endif %}
 
-    <div class="alumno-info">
+    <div class="alumno-info entrada-escalonada" style="--i:0">
       <div><b>Plan</b><span class="v">{{ alumno.Plan }}</span></div>
       <div><b>Periodo inicio</b><span class="v">{{ alumno.PerInicio }}</span></div>
       <div><b>Periodo activo</b><span class="v">{{ ajustes.get('periodo_actual', '—') }}</span></div>
@@ -89,7 +123,7 @@
 
     <div class="layout">
       <div class="form-col">
-        <div class="card">
+        <div class="card entrada-escalonada" style="--i:1">
           <h2>
             <svg viewBox="0 0 24 24"><path d="M3 5a2 2 0 012-2h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5zm4 3h10v2H7V8zm0 4h10v2H7v-2zm0 4h6v2H7v-2z"/></svg>
             Campos
@@ -166,24 +200,31 @@
       </div>
 
       <div class="preview-col">
-        <div class="card">
+        <div class="card entrada-escalonada" style="--i:2">
           <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
             <h2 style="margin:0;">
               <svg viewBox="0 0 24 24"><path d="M12 5c-5 0-9 4.5-10 7 1 2.5 5 7 10 7s9-4.5 10-7c-1-2.5-5-7-10-7zm0 11a4 4 0 110-8 4 4 0 010 8zm0-6a2 2 0 100 4 2 2 0 000-4z"/></svg>
               Vista previa
             </h2>
-            <span id="status" class="preview-status">listo</span>
+            <span id="status" class="preview-status" role="status" aria-live="polite">listo</span>
           </div>
-          <iframe id="pdfFrame" class="pdf-frame" title="Vista previa PDF"></iframe>
+          <div id="pdfFrameWrap" class="pdf-frame-wrap">
+            <iframe id="pdfFrame" class="pdf-frame" title="Vista previa PDF"></iframe>
+            <div id="pdfSkeleton" class="pdf-skeleton"><span id="pdfSkeletonTexto" class="skeleton">Generando vista previa…</span></div>
+          </div>
         </div>
       </div>
     </div>
   </div>
 
-  <script src="/static/theme.js?v=5"></script>
+  <script src="/static/theme.js?v=10"></script>
+  <script src="/static/ui.js?v=10"></script>
   <script>
     const form = document.getElementById("formCampos");
+    const frameWrap = document.getElementById("pdfFrameWrap");
     const frame = document.getElementById("pdfFrame");
+    const skeleton = document.getElementById("pdfSkeleton");
+    const skeletonTexto = document.getElementById("pdfSkeletonTexto");
     const status = document.getElementById("status");
     const btnDocx = document.getElementById("btnDocx");
     const btnPdf = document.getElementById("btnPdf");
@@ -191,6 +232,7 @@
     let lastObjectUrl = null;
     let pendingTimer = null;
     let abortCtrl = null;
+    let mensajeTimers = [];
 
     function setStatus(text, error = false) {
       status.textContent = text;
@@ -199,10 +241,39 @@
       status.style.color = error ? "var(--on-error-container)" : "var(--on-surface-variant)";
     }
 
+    function limpiarMensajeTimers() {
+      mensajeTimers.forEach((t) => clearTimeout(t));
+      mensajeTimers = [];
+    }
+
+    function mostrarCarga() {
+      frameWrap.classList.add("pdf-frame-wrap--cargando");
+      frame.classList.add("pdf-frame--cargando");
+      skeleton.classList.add("visible");
+      skeletonTexto.textContent = "Generando vista previa…";
+      limpiarMensajeTimers();
+      // La conversión real (arranque en frío de LibreOffice) puede tardar
+      // 2-5s; adelantamos el mensaje largo antes de ese punto.
+      mensajeTimers.push(setTimeout(() => {
+        skeletonTexto.textContent = "Un momento, casi lista…";
+      }, 1200));
+      mensajeTimers.push(setTimeout(() => {
+        skeletonTexto.textContent = "LibreOffice está componiendo el documento…";
+      }, 2500));
+    }
+
+    function ocultarCarga() {
+      limpiarMensajeTimers();
+      frameWrap.classList.remove("pdf-frame-wrap--cargando");
+      frame.classList.remove("pdf-frame--cargando");
+      skeleton.classList.remove("visible");
+    }
+
     async function refreshPreview() {
       if (abortCtrl) abortCtrl.abort();
       abortCtrl = new AbortController();
       setStatus("generando…");
+      mostrarCarga();
       try {
         const res = await fetch("/preview.pdf", {
           method: "POST",
@@ -211,6 +282,7 @@
         });
         if (!res.ok) {
           setStatus("error " + res.status, true);
+          ocultarCarga();
           return;
         }
         const blob = await res.blob();
@@ -218,12 +290,24 @@
         // Mantener la página actual del visor cuando se regenera
         const prevSrc = frame.src;
         const hash = prevSrc.includes("#") ? "#" + prevSrc.split("#")[1] : "";
+        const anteriorUrl = lastObjectUrl;
+        // El iframe pinta el PDF de forma asíncrona: espera a "load" antes de
+        // quitar el skeleton, con un timeout de respaldo por si no dispara.
+        let resuelto = false;
+        const terminar = () => {
+          if (resuelto) return;
+          resuelto = true;
+          frame.removeEventListener("load", terminar);
+          setStatus("actualizado");
+          ocultarCarga();
+          if (anteriorUrl) URL.revokeObjectURL(anteriorUrl);
+        };
+        frame.addEventListener("load", terminar, { once: true });
+        setTimeout(terminar, 1500);
         frame.src = url + hash;
-        if (lastObjectUrl) URL.revokeObjectURL(lastObjectUrl);
         lastObjectUrl = url;
-        setStatus("actualizado");
       } catch (e) {
-        if (e.name !== "AbortError") setStatus("error", true);
+        if (e.name !== "AbortError") { setStatus("error", true); ocultarCarga(); }
       }
     }
 
@@ -235,28 +319,36 @@
     form.addEventListener("input", debouncedRefresh);
     form.addEventListener("change", debouncedRefresh);
 
-    async function descargar(url, ext) {
+    async function descargar(url, ext, boton) {
       const fd = new FormData(form);
-      // validar género al descargar
-      if (!fd.get("__genero__") && [...fd.keys()].some(k => k === "__genero__")) {
-        alert("Selecciona el género antes de descargar.");
+      // validar género al descargar (solo si la plantilla pide ese campo)
+      if (form.querySelector('input[name="__genero__"]') && !fd.get("__genero__")) {
+        avisar("Selecciona el género antes de descargar.", "error");
         return;
       }
-      const res = await fetch(url, { method: "POST", body: fd });
-      if (!res.ok) {
-        alert("Error generando archivo: " + res.status);
-        return;
+      boton.setAttribute("aria-busy", "true");
+      boton.disabled = true;
+      try {
+        const res = await fetch(url, { method: "POST", body: fd });
+        if (!res.ok) {
+          avisar("Error generando archivo: " + res.status, "error");
+          return;
+        }
+        const blob = await res.blob();
+        const a = document.createElement("a");
+        a.href = URL.createObjectURL(blob);
+        a.download = "Constancia_{{ alumno.Cuenta }}." + ext;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+        avisar("Constancia descargada", "exito");
+      } finally {
+        boton.removeAttribute("aria-busy");
+        boton.disabled = false;
       }
-      const blob = await res.blob();
-      const a = document.createElement("a");
-      a.href = URL.createObjectURL(blob);
-      a.download = "Constancia_{{ alumno.Cuenta }}." + ext;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(a.href), 5000);
     }
 
-    btnDocx.addEventListener("click", () => descargar("/generar/docx", "docx"));
-    btnPdf.addEventListener("click", () => descargar("/generar/pdf", "pdf"));
+    btnDocx.addEventListener("click", () => descargar("/generar/docx", "docx", btnDocx));
+    btnPdf.addEventListener("click", () => descargar("/generar/pdf", "pdf", btnPdf));
 
     // ---------- Líneas opcionales: switch incluir / omitir ----------
     // Al apagar el switch deshabilitamos los controles del campo; los campos
@@ -321,14 +413,14 @@
 
       btnGuardarCmd.addEventListener("click", async () => {
         const texto = taLibre.value.trim();
-        if (!texto) { alert("Escribe algo en la línea libre antes de guardarlo."); return; }
-        const titulo = prompt("Título del comodín:");
-        if (!titulo || !titulo.trim()) return;
+        if (!texto) { avisar("Escribe algo en la línea libre antes de guardarlo.", "error"); return; }
+        const titulo = await pedirTexto({ titulo: "Guardar comodín", placeholder: "Título del comodín", textoConfirmar: "Guardar" });
+        if (!titulo) return;
         const fd = new FormData();
-        fd.append("titulo", titulo.trim());
+        fd.append("titulo", titulo);
         fd.append("texto", texto);
         const res = await fetch("/comodines", { method: "POST", body: fd });
-        if (!res.ok) { alert("No se pudo guardar."); return; }
+        if (!res.ok) { avisar("No se pudo guardar.", "error"); return; }
         const nuevo = await res.json();
         comodinesCache.push(nuevo);
         pintarOpciones();
@@ -337,11 +429,17 @@
 
       btnEliminarCmd.addEventListener("click", async () => {
         const id = selComodin.value;
-        if (!id) { alert("Selecciona un comodín a eliminar."); return; }
+        if (!id) { avisar("Selecciona un comodín a eliminar.", "error"); return; }
         const c = comodinesCache.find(x => x.id === id);
-        if (!confirm(`¿Eliminar comodín "${c.titulo}"?`)) return;
+        const ok = await confirmar({
+          titulo: "¿Eliminar comodín?",
+          mensaje: `¿Eliminar el comodín "${c.titulo}"?`,
+          peligro: true,
+          textoConfirmar: "Eliminar",
+        });
+        if (!ok) return;
         const res = await fetch(`/comodines/${id}`, { method: "DELETE" });
-        if (!res.ok) { alert("No se pudo eliminar."); return; }
+        if (!res.ok) { avisar("No se pudo eliminar.", "error"); return; }
         comodinesCache = comodinesCache.filter(x => x.id !== id);
         pintarOpciones();
       });
@@ -363,6 +461,6 @@
       ]
     };
   </script>
-  <script src="/static/tour.js?v=5"></script>
+  <script src="/static/tour.js?v=10"></script>
 </body>
 </html>

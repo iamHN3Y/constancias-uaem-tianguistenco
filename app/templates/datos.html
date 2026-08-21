@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Datos de alumnos</title>
-  <link rel="stylesheet" href="/static/styles.css?v=5">
+  <link rel="stylesheet" href="/static/styles.css?v=10">
 </head>
 <body>
   <div class="page" style="max-width: 820px;">
@@ -37,10 +37,10 @@
       </div>
     {% endif %}
 
-    <div class="card">
+    <div class="card entrada-escalonada" style="--i:0" id="tour-estado">
       <h2>
         <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm-1 5h2v6h-2V7zm0 8h2v2h-2v-2z"/></svg>
-        Estado actual
+        Estado actual — padrón principal
       </h2>
       {% if datos %}
         <p><strong>{{ datos.filename }}</strong><br>{{ datos.filas }} alumnos · cargado {{ datos.fecha_carga }}</p>
@@ -49,13 +49,35 @@
       {% endif %}
     </div>
 
-    <div class="card">
+    <div class="card entrada-escalonada" style="--i:1" id="tour-salud">
+      <h2>
+        <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+        Panel de salud
+      </h2>
+      <p style="margin: 0 0 6px;">Total en el padrón principal: <strong>{{ salud.total }}</strong></p>
+      <p style="margin: 0 0 6px;">Sin columna Sexo o con Sexo vacío: <strong>{{ salud.sin_sexo }}</strong> (el género no se prellena para esos alumnos)</p>
+      <p style="margin: 0;">Alumnos disponibles solo por «nuevo ingreso»: <strong>{{ salud.nuevo_ingreso }}</strong></p>
+      {% if not ajustes.get('periodo_actual', '') %}
+        <div class="note note-error" style="margin-top: 14px; margin-bottom: 0;">
+          <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
+          <span>No hay periodo activo configurado (en la pantalla principal). Mientras tanto, el semestre de los alumnos de nuevo ingreso saldrá vacío.</span>
+        </div>
+      {% endif %}
+    </div>
+
+    <div class="card entrada-escalonada" style="--i:2">
       <h2>
         <svg viewBox="0 0 24 24"><path d="M12 2l5 5h-3v6h-4V7H7l5-5zM5 18h14v2H5v-2z"/></svg>
-        Subir / reemplazar
+        Subir / reemplazar padrón principal
       </h2>
       <p>Formatos aceptados: <code>.xls</code>, <code>.xlsx</code>, <code>.csv</code>. El archivo nuevo sustituye al anterior.</p>
-      <form action="/datos/upload" method="post" enctype="multipart/form-data">
+      <form action="/datos/upload" method="post" enctype="multipart/form-data"
+            {% if datos %}
+            data-confirmar data-confirmar-peligro
+            data-confirmar-titulo="¿Reemplazar padrón?"
+            data-confirmar-mensaje="Esto reemplazará «{{ datos.filename }}» y sus {{ datos.filas }} alumnos."
+            data-confirmar-texto="Reemplazar"
+            {% endif %}>
         <div class="field">
           <label for="archivo">Archivo de datos</label>
           <input id="archivo" type="file" name="archivo" accept=".xls,.xlsx,.csv" required>
@@ -65,17 +87,67 @@
         </div>
       </form>
     </div>
+
+    <div class="card entrada-escalonada" style="--i:3" id="tour-nuevo-ingreso">
+      <h2>
+        <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm5 11h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/></svg>
+        Alumnos de nuevo ingreso
+      </h2>
+      <p>
+        Archivo secundario (Excel de control escolar) para alumnos que aún no aparecen en el padrón
+        principal. Se consulta <strong>solo cuando la cuenta no está en el padrón principal</strong>:
+        si un alumno existe en ambos, siempre gana el padrón principal. No se fusiona con
+        <code>datos.csv</code>; cuando un alumno avanza de semestre y aparece en un padrón principal
+        nuevo, se elimina automáticamente de aquí.
+      </p>
+      {% if ni %}
+        <p>
+          <strong>{{ ni.filename }}</strong><br>
+          {{ ni.filas }} alumnos · cargado {{ ni.fecha_carga }}
+          {% if ni.periodo %} · periodo {{ ni.periodo }}{% endif %}
+        </p>
+        <form action="/datos/nuevo-ingreso/eliminar" method="post"
+              data-confirmar data-confirmar-peligro
+              data-confirmar-titulo="¿Eliminar archivo?"
+              data-confirmar-mensaje="¿Eliminar el archivo de alumnos de nuevo ingreso? Esta acción no se puede deshacer."
+              data-confirmar-texto="Eliminar">
+          <div class="actions">
+            <button type="submit" class="btn-tonal">Eliminar archivo</button>
+          </div>
+        </form>
+      {% else %}
+        <p>No hay archivo de nuevo ingreso cargado todavía.</p>
+      {% endif %}
+      <form action="/datos/nuevo-ingreso" method="post" enctype="multipart/form-data"
+            {% if ni %}
+            data-confirmar data-confirmar-peligro
+            data-confirmar-titulo="¿Reemplazar archivo de nuevo ingreso?"
+            data-confirmar-mensaje="Esto reemplazará «{{ ni.filename }}» y sus {{ ni.filas }} alumnos."
+            data-confirmar-texto="Reemplazar"
+            {% endif %}>
+        <div class="field">
+          <label for="archivoNi">Excel de alumnos de nuevo ingreso</label>
+          <input id="archivoNi" type="file" name="archivo" accept=".xls,.xlsx" required>
+        </div>
+        <div class="actions">
+          <button type="submit">Subir archivo</button>
+        </div>
+      </form>
+    </div>
   </div>
-  <script src="/static/theme.js?v=5"></script>
+  <script src="/static/theme.js?v=10"></script>
+  <script src="/static/ui.js?v=10"></script>
   <script>
     window.TOUR = {
       key: "datos",
       steps: [
-        { sel: ".card", title: "Estado actual", text: "Aquí ves qué archivo de alumnos está cargado y cuántos registros tiene." },
-        { sel: "#archivo", title: "Subir o reemplazar", text: "Elige un archivo .xls, .xlsx o .csv y pulsa Subir. El nuevo reemplaza por completo al anterior." }
+        { sel: "#tour-estado", title: "Estado actual", text: "Aquí ves qué archivo de alumnos está cargado y cuántos registros tiene." },
+        { sel: "#tour-salud", title: "Panel de salud", text: "Resumen rápido del padrón: cuántos alumnos hay, a cuántos les falta la columna Sexo, y cuántos solo existen en «nuevo ingreso»." },
+        { sel: "#archivo", title: "Subir o reemplazar", text: "Elige un archivo .xls, .xlsx o .csv y pulsa Subir. El nuevo reemplaza por completo al anterior." },
+        { sel: "#tour-nuevo-ingreso", title: "Alumnos de nuevo ingreso", text: "Archivo aparte para alumnos que todavía no están en el padrón principal. Si una cuenta existe en ambos, siempre gana el padrón principal." }
       ]
     };
   </script>
-  <script src="/static/tour.js?v=5"></script>
+  <script src="/static/tour.js?v=10"></script>
 </body>
 </html>

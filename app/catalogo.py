@@ -58,17 +58,6 @@ def tipo_de(ph: str) -> str:
     return TEXT
 
 
-# Placeholders cuyo valor depende del alumno (se derivan de su fila del
-# Excel). El resto son compartidos: fechas del periodo, líneas libres, y
-# cualquier placeholder nuevo de la plantilla. La generación por lotes usa
-# esta distinción: lo por-alumno se deriva solo, lo compartido se pide una vez.
-PLACEHOLDERS_POR_ALUMNO = frozenset({
-    "NOMBRE_COMPLETO", "CUENTA", "CARRERA_FULL", "SEMESTRE_TEXTO",
-    "SEMESTRES_TOTALES", "ARTICULO", "INTERESADO_FRASE",
-    "PROMEDIO_GENERAL_LINEA", "PROMEDIO_ULTIMO_LINEA",
-})
-
-
 def _derivar_well_known(alumno: dict, ajustes: dict, carreras) -> dict:
     """
     Devuelve {placeholder: {"valor": str, "iso": str | None}} con los
@@ -205,29 +194,3 @@ def construir_campos_form(placeholders: list[str], alumno: dict, ajustes: dict,
             "de_plantilla": meta is None,
         })
     return campos
-
-
-def valores_por_alumno(placeholders: list[str], alumno: dict, ajustes: dict,
-                       carreras) -> tuple[dict, list[str]]:
-    """
-    Valores derivados automáticamente para los placeholders POR ALUMNO de una
-    plantilla (generación por lotes). Devuelve (valores, faltantes):
-
-    - valores: {placeholder: texto} solo para los que se pudieron derivar.
-    - faltantes: placeholders por-alumno que quedaron sin valor (p. ej.
-      ARTICULO sin columna Sexo) — el placeholder queda visible en el .docx
-      y el lote lo reporta para revisión manual.
-    """
-    derivados = _derivar_well_known(alumno, ajustes, carreras)
-    valores, faltantes = {}, []
-    for ph in placeholders:
-        if ph not in PLACEHOLDERS_POR_ALUMNO:
-            continue
-        v = derivados.get(ph, {}).get("valor", "")
-        if v or es_opcional(ph):
-            # Las líneas opcionales sin dato se pasan vacías: su párrafo
-            # se elimina solo, no es un faltante.
-            valores[ph] = v
-        else:
-            faltantes.append(ph)
-    return valores, faltantes

@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Plantillas</title>
-  <link rel="stylesheet" href="/static/styles.css?v=5">
+  <link rel="stylesheet" href="/static/styles.css?v=10">
   <style>
     .tpl-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 14px; }
     .tpl-replace { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
@@ -70,7 +70,7 @@
     </div>
 
     {% for it in items %}
-    <div class="card tpl-card">
+    <div class="card tpl-card entrada-escalonada" style="--i:{{ loop.index0 }}">
       <h2>
         <svg viewBox="0 0 24 24"><path d="M4 4a2 2 0 012-2h8l6 6v12a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm9 1v5h5l-5-5z"/></svg>
         {{ it.nombre }}
@@ -108,7 +108,11 @@
         </form>
         {% if items|length > 1 %}
         <form action="/plantillas/{{ it.slug }}/eliminar" method="post"
-              onsubmit="return confirm('¿Eliminar la plantilla «{{ it.nombre }}» y su historial? Esta acción no se puede deshacer.');">
+              data-confirmar data-confirmar-peligro
+              data-confirmar-titulo="¿Eliminar plantilla?"
+              data-confirmar-mensaje="Esto elimina «{{ it.nombre }}» y todo su historial. Esta acción no se puede deshacer. Escribe «{{ it.slug }}» para confirmar."
+              data-confirmar-texto="Eliminar"
+              data-confirmar-escribir-para="{{ it.slug }}">
           <button type="submit" class="icon-btn" title="Eliminar plantilla" aria-label="Eliminar plantilla">
             <svg viewBox="0 0 24 24"><path d="M6 7h12l-1 13a2 2 0 01-2 2H9a2 2 0 01-2-2L6 7zm3-3h6l1 2h4v2H4V6h4l1-2z"/></svg>
           </button>
@@ -120,11 +124,14 @@
       <details class="historial">
         <summary>Historial ({{ it.historial|length }} versiones respaldadas)</summary>
         {% for v in it.historial %}
-          <form class="hist-row" action="/plantillas/{{ it.slug }}/restaurar" method="post">
+          <form class="hist-row" action="/plantillas/{{ it.slug }}/restaurar" method="post"
+                data-confirmar data-confirmar-peligro
+                data-confirmar-titulo="¿Restaurar versión?"
+                data-confirmar-mensaje="¿Restaurar la versión del {{ v.fecha }}? La actual quedará en el historial."
+                data-confirmar-texto="Restaurar">
             <span style="font-size:14px;">{{ v.fecha }}</span>
             <input type="hidden" name="nombre" value="{{ v.nombre }}">
-            <button type="submit" class="btn-tonal" style="min-height:36px; padding:6px 14px;"
-                    onclick="return confirm('¿Restaurar la versión del {{ v.fecha }}? La actual quedará en el historial.');">
+            <button type="submit" class="btn-tonal" style="min-height:36px; padding:6px 14px;">
               Restaurar
             </button>
           </form>
@@ -134,7 +141,7 @@
     </div>
     {% endfor %}
 
-    <div class="card" id="crear">
+    <div class="card entrada-escalonada" style="--i:{{ items|length }}" id="crear">
       <h2>
         <svg viewBox="0 0 24 24"><path d="M12 5v14m-7-7h14" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/></svg>
         Nueva plantilla
@@ -155,7 +162,8 @@
       </form>
     </div>
   </div>
-  <script src="/static/theme.js?v=5"></script>
+  <script src="/static/theme.js?v=10"></script>
+  <script src="/static/ui.js?v=10"></script>
   <script>
     window.TOUR = {
       key: "plantillas-multi",
@@ -166,6 +174,6 @@
       ]
     };
   </script>
-  <script src="/static/tour.js?v=5"></script>
+  <script src="/static/tour.js?v=10"></script>
 </body>
 </html>

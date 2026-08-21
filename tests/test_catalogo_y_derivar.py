@@ -122,30 +122,6 @@ def test_genero_prellenado_desde_columna_sexo(carreras):
     assert campos[0]["valor"] == "la alumna"
 
 
-def test_valores_por_alumno_deriva_y_reporta_faltantes(carreras):
-    placeholders = ["NOMBRE_COMPLETO", "CUENTA", "ARTICULO", "PROMEDIO_GENERAL_LINEA",
-                    "LINEA_LIBRE", "FECHA_EXPEDICION"]
-    alumno = {"NombreAlumno": "PEREZ / JUAN", "Cuenta": "123", "PrmGR": "8.5"}
-    valores, faltantes = catalogo.valores_por_alumno(placeholders, alumno, {}, carreras)
-    assert valores["NOMBRE_COMPLETO"] == "PEREZ JUAN"
-    assert valores["CUENTA"] == "123"
-    assert "8.5" in valores["PROMEDIO_GENERAL_LINEA"]
-    # Sin columna Sexo, ARTICULO no se puede derivar → va en faltantes.
-    assert faltantes == ["ARTICULO"]
-    # Lo compartido (LINEA_LIBRE, FECHA_EXPEDICION) no lo toca esta función.
-    assert "LINEA_LIBRE" not in valores
-    assert "FECHA_EXPEDICION" not in valores
-
-
-def test_valores_por_alumno_con_sexo(carreras):
-    valores, faltantes = catalogo.valores_por_alumno(
-        ["ARTICULO", "INTERESADO_FRASE"], {"Sexo": "FEMENINO"}, {}, carreras,
-    )
-    assert valores["ARTICULO"] == "la alumna"
-    assert valores["INTERESADO_FRASE"] == "de la interesada"
-    assert faltantes == []
-
-
 # ---------- Derivaciones ----------
 
 def test_fecha_texto_corto():

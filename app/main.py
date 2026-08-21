@@ -16,7 +16,6 @@ import os
 import re
 import unicodedata
 import uuid
-import zipfile
 from contextlib import asynccontextmanager
 from datetime import datetime
 from urllib.parse import quote
@@ -47,6 +46,7 @@ PLANTILLAS_DIR = os.path.join(DATA_DIR, "plantillas")
 TMP_DIR = os.path.join(DATA_DIR, "tmp")
 BOOTSTRAP_PLANTILLA = os.path.join(BASE_DIR, "bootstrap_plantillas", "universal.docx")
 DATOS_CSV = os.path.join(DATA_DIR, "datos.csv")
+NUEVO_INGRESO_CSV = os.path.join(DATA_DIR, "nuevo_ingreso.csv")
 AJUSTES_FILE = os.path.join(DATA_DIR, "ajustes.json")
 COMODINES_FILE = os.path.join(DATA_DIR, "comodines.json")
 CARRERAS_FILE = os.path.join(DATA_DIR, "carreras.json")
@@ -165,6 +165,11 @@ def _normalizar_columnas(df: pd.DataFrame) -> pd.DataFrame:
     return df.rename(columns=renombres) if renombres else df
 
 
+def _normalizar_cuenta(serie: pd.Series) -> pd.Series:
+    # Excel a veces entrega las cuentas como número flotante ("2014694.0").
+    return serie.astype(str).str.strip().str.replace(r"\.0$", "", regex=True)
+
+
 def guardar_datos(upload_path: str, original_filename: str):
     ext = os.path.splitext(original_filename)[1].lower()
     try:
@@ -186,8 +191,7 @@ def guardar_datos(upload_path: str, original_filename: str):
     if df.empty:
         raise ValueError("El archivo no tiene filas de alumnos. Se conservan los datos anteriores.")
 
-    # Excel a veces entrega las cuentas como número flotante ("2014694.0").
-    df["Cuenta"] = df["Cuenta"].astype(str).str.strip().str.replace(r"\.0$", "", regex=True)
+    df["Cuenta"] = _normalizar_cuenta(df["Cuenta"])
 
     # Si hay columna Sexo, determinar el esquema: con valores 'H' presentes,
     # una 'M' significa Mujer; sin 'H', significa Masculino. Se decide una vez
@@ -211,15 +215,29 @@ def guardar_datos(upload_path: str, original_filename: str):
     })
     guardar_ajustes(aj)
 
+    # Purga automática: si algún alumno de nuevo ingreso ya avanzó de
+    # semestre y aparece en el padrón académico normal, se quita de
+    # nuevo_ingreso.csv para no dejar duplicados fantasma.
+    _purgar_nuevo_ingreso(set(df["Cuenta"].astype(str).str.strip()))
+
 
 def buscar_alumno(cuenta: str) -> dict | None:
+    cuenta = str(cuenta).strip()
     df = leer_datos()
-    if df.empty or "Cuenta" not in df.columns:
-        return None
-    fila = df.loc[df["Cuenta"].astype(str).str.strip() == str(cuenta).strip()]
-    if fila.empty:
-        return None
-    return {k: ("" if v is None else str(v)) for k, v in fila.iloc[0].to_dict().items()}
+    if not df.empty and "Cuenta" in df.columns:
+        fila = df.loc[df["Cuenta"].astype(str).str.strip() == cuenta]
+        if not fila.empty:
+            return {k: ("" if v is None else str(v)) for k, v in fila.iloc[0].to_dict().items()}
+
+    # Fallback: solo si la cuenta no está en el padrón principal.
+    dfni = leer_nuevo_ingreso()
+    if not dfni.empty and "Cuenta" in dfni.columns:
+        fila = dfni.loc[dfni["Cuenta"].astype(str).str.strip() == cuenta]
+        if not fila.empty:
+            reg = {k: ("" if v is None else str(v)) for k, v in fila.iloc[0].to_dict().items()}
+            reg["_origen"] = "nuevo_ingreso"
+            return reg
+    return None
 
 
 def _sin_acentos_lower(s: str) -> str:
@@ -231,21 +249,199 @@ def buscar_por_nombre(texto: str, limite: int = 20) -> list[dict]:
     """
     Alumnos cuyo nombre contiene todas las palabras buscadas, sin distinguir
     mayúsculas ni acentos. 'perez juan' encuentra 'PÉREZ / JUAN'.
+
+    Busca primero en el padrón principal; completa con nuevo_ingreso.csv sin
+    repetir cuentas que ya hayan salido del padrón.
     """
-    df = leer_datos()
-    if df.empty or "NombreAlumno" not in df.columns:
-        return []
     palabras = [_sin_acentos_lower(p) for p in texto.split() if p.strip()]
     if not palabras:
         return []
-    resultados = []
-    for _, fila in df.iterrows():
-        nombre = _sin_acentos_lower(fila.get("NombreAlumno", ""))
-        if all(p in nombre for p in palabras):
+
+    resultados: list[dict] = []
+    vistos: set[str] = set()
+
+    df = leer_datos()
+    if not df.empty and "NombreAlumno" in df.columns:
+        for _, fila in df.iterrows():
+            nombre = _sin_acentos_lower(fila.get("NombreAlumno", ""))
+            if not all(p in nombre for p in palabras):
+                continue
+            cuenta = str(fila.get("Cuenta", "")).strip()
+            if cuenta in vistos:
+                continue
+            vistos.add(cuenta)
             resultados.append({k: str(v) for k, v in fila.to_dict().items()})
             if len(resultados) >= limite:
+                return resultados
+
+    dfni = leer_nuevo_ingreso()
+    if not dfni.empty and "NombreAlumno" in dfni.columns:
+        for _, fila in dfni.iterrows():
+            if len(resultados) >= limite:
                 break
+            nombre = _sin_acentos_lower(fila.get("NombreAlumno", ""))
+            if not all(p in nombre for p in palabras):
+                continue
+            cuenta = str(fila.get("Cuenta", "")).strip()
+            if cuenta in vistos:
+                continue
+            vistos.add(cuenta)
+            reg = {k: str(v) for k, v in fila.to_dict().items()}
+            reg["_origen"] = "nuevo_ingreso"
+            resultados.append(reg)
+
     return resultados
+
+
+# ---------- Alumnos de nuevo ingreso (archivo secundario con fallback) ----------
+#
+# Fuente secundaria consultada SOLO cuando una cuenta no está en el padrón
+# principal (datos.csv). Nunca se fusiona con él: vive aparte en
+# nuevo_ingreso.csv y se purga sola cuando esas cuentas aparecen en un
+# padrón nuevo (ver _purgar_nuevo_ingreso, llamada desde guardar_datos).
+
+COLUMNAS_NUEVO_INGRESO = ("Cuenta", "Paterno", "Materno", "Nombres", "Plan", "Periodo")
+
+
+def ni_meta() -> dict | None:
+    if not os.path.exists(NUEVO_INGRESO_CSV):
+        return None
+    aj = cargar_ajustes()
+    return {
+        "filas": aj.get("ni_filas", 0),
+        "filename": aj.get("ni_filename", ""),
+        "fecha_carga": aj.get("ni_fecha_carga", ""),
+        "periodo": aj.get("ni_periodo", ""),
+    }
+
+
+def leer_nuevo_ingreso() -> pd.DataFrame:
+    if not os.path.exists(NUEVO_INGRESO_CSV):
+        return pd.DataFrame()
+    return pd.read_csv(NUEVO_INGRESO_CSV, dtype=str, keep_default_na=False)
+
+
+def _fila_vacia_o_incompleta(fila) -> bool:
+    """Descarta filas de título sueltas u otra basura: 3+ celdas vacías."""
+    vacios = sum(1 for v in fila if str(v).strip() in ("", "nan", "NaN"))
+    return vacios >= 3
+
+
+def guardar_nuevo_ingreso(upload_path: str, original_filename: str):
+    try:
+        df = pd.read_excel(upload_path, header=None, dtype=str)
+    except Exception as e:
+        raise ValueError(
+            f"No se pudo leer el archivo ({e}). Se conservan los datos anteriores."
+        ) from e
+
+    if df.shape[1] != 6:
+        raise ValueError(
+            "El archivo debe tener exactamente 6 columnas (Cuenta, Apellido paterno, "
+            "Apellido materno, Nombre(s), Plan, Periodo). Se conservan los datos "
+            f"anteriores. Columnas encontradas: {df.shape[1]}."
+        )
+
+    df = df.fillna("")
+    df = df[~df.apply(_fila_vacia_o_incompleta, axis=1)].reset_index(drop=True)
+    if df.empty:
+        raise ValueError(
+            "El archivo no tiene filas de alumnos utilizables. Se conservan los datos anteriores."
+        )
+
+    # Fila de encabezado falsa: si la primera fila trae la columna 0 (Cuenta)
+    # no numérica, es un título/encabezado suelto y no un alumno.
+    primera_cuenta = str(df.iloc[0, 0]).strip()
+    if primera_cuenta and not primera_cuenta.replace(".", "", 1).isdigit():
+        df = df.iloc[1:].reset_index(drop=True)
+    if df.empty:
+        raise ValueError(
+            "El archivo no tiene filas de alumnos utilizables. Se conservan los datos anteriores."
+        )
+
+    df.columns = list(COLUMNAS_NUEVO_INGRESO)
+    df["Cuenta"] = _normalizar_cuenta(df["Cuenta"])
+
+    def _nombre_alumno(fila) -> str:
+        apellidos = re.sub(r"\s+", " ", f"{fila['Paterno']} {fila['Materno']}").strip()
+        nombres = str(fila["Nombres"]).strip()
+        return f"{apellidos} / {nombres}".strip(" /")
+
+    df["NombreAlumno"] = df.apply(_nombre_alumno, axis=1)
+    df["PerInicio"] = df["Periodo"].astype(str).str.strip()
+
+    df = df.drop_duplicates(subset="Cuenta", keep="last")
+    salida = df[["Cuenta", "NombreAlumno", "Plan", "PerInicio"]].copy()
+
+    tmp = NUEVO_INGRESO_CSV + ".tmp"
+    salida.to_csv(tmp, index=False)
+    os.replace(tmp, NUEVO_INGRESO_CSV)
+
+    periodos = [v for v in salida["PerInicio"] if v]
+    periodo = max(set(periodos), key=periodos.count) if periodos else ""
+
+    aj = cargar_ajustes()
+    aj.update({
+        "ni_filename": original_filename,
+        "ni_fecha_carga": datetime.now().isoformat(timespec="seconds"),
+        "ni_filas": int(len(salida)),
+        "ni_periodo": periodo,
+    })
+    guardar_ajustes(aj)
+
+    # Si el padrón principal ya existe, purga de inmediato las cuentas que
+    # ya estén ahí (orden típico: nuevo ingreso se sube después del padrón).
+    dfp = leer_datos()
+    if not dfp.empty and "Cuenta" in dfp.columns:
+        _purgar_nuevo_ingreso(set(dfp["Cuenta"].astype(str).str.strip()))
+
+
+def eliminar_nuevo_ingreso():
+    _eliminar_silenciosamente(NUEVO_INGRESO_CSV)
+    aj = cargar_ajustes()
+    for k in ("ni_filename", "ni_fecha_carga", "ni_filas", "ni_periodo"):
+        aj.pop(k, None)
+    guardar_ajustes(aj)
+
+
+def _purgar_nuevo_ingreso(cuentas_padron: set[str]):
+    """
+    Quita de nuevo_ingreso.csv cualquier cuenta que ya esté en el padrón
+    principal recién subido, para no dejar duplicados fantasma cuando esos
+    alumnos avanzan de semestre y aparecen en el padrón académico normal.
+    """
+    if not cuentas_padron or not os.path.exists(NUEVO_INGRESO_CSV):
+        return
+    df = leer_nuevo_ingreso()
+    if df.empty or "Cuenta" not in df.columns:
+        return
+    antes = len(df)
+    df = df.loc[~df["Cuenta"].astype(str).str.strip().isin(cuentas_padron)]
+    if len(df) == antes:
+        return
+
+    tmp = NUEVO_INGRESO_CSV + ".tmp"
+    df.to_csv(tmp, index=False)
+    os.replace(tmp, NUEVO_INGRESO_CSV)
+
+    aj = cargar_ajustes()
+    aj["ni_filas"] = int(len(df))
+    guardar_ajustes(aj)
+
+
+def panel_salud() -> dict:
+    """Resumen de solo lectura para la vista /datos."""
+    df = leer_datos()
+    total = int(len(df)) if not df.empty else 0
+    if total and "Sexo" in df.columns:
+        sin_sexo = int((df["Sexo"].astype(str).str.strip() == "").sum())
+    else:
+        sin_sexo = total
+
+    dfni = leer_nuevo_ingreso()
+    nuevo_ingreso = int(len(dfni)) if not dfni.empty else 0
+
+    return {"total": total, "sin_sexo": sin_sexo, "nuevo_ingreso": nuevo_ingreso}
 
 
 # ---------- Limpieza de tmp ----------
@@ -342,6 +538,7 @@ async def home(request: Request):
 
     return templates.TemplateResponse(request, "home.html", {
         "datos": datos_meta(),
+        "ni": ni_meta(),
         "plantillas": plantillas.listar(),
         "ajustes": aj,
         "es_admin": es_admin(request),
@@ -355,9 +552,9 @@ async def actualizar_ajustes(request: Request, periodo_actual: str = Form(""),
                              periodo_inicio: str = Form(""), periodo_fin: str = Form("")):
     """
     Guarda el periodo activo y (opcionalmente) sus fechas reales de inicio y
-    fin. Se capturan UNA vez por semestre: todas las constancias —individuales
-    y por lote— salen prellenadas con ellas. Si se dejan vacías, se usan las
-    fechas típicas del periodo (02 feb / 02 ago) como aproximación editable.
+    fin. Se capturan UNA vez por semestre: todas las constancias salen
+    prellenadas con ellas. Si se dejan vacías, se usan las fechas típicas
+    del periodo (02 feb / 02 ago) como aproximación editable.
     """
     bloqueo = _bloquear_si_no_admin(request)
     if bloqueo: return bloqueo
@@ -408,6 +605,8 @@ async def datos_page(request: Request):
     if bloqueo: return bloqueo
     return templates.TemplateResponse(request, "datos.html", {
         "datos": datos_meta(),
+        "ni": ni_meta(),
+        "salud": panel_salud(),
         "ajustes": cargar_ajustes(),
     })
 
@@ -428,6 +627,33 @@ async def datos_upload(request: Request, archivo: UploadFile = File(...)):
         return RedirectResponse(url=f"/datos?error={quote(str(e))}", status_code=303)
     finally:
         _eliminar_silenciosamente(tmp_path)
+    return RedirectResponse(url="/datos?ok=1", status_code=303)
+
+
+@app.post("/datos/nuevo-ingreso")
+async def nuevo_ingreso_upload(request: Request, archivo: UploadFile = File(...)):
+    bloqueo = _bloquear_si_no_admin(request)
+    if bloqueo: return bloqueo
+    ext = os.path.splitext(archivo.filename)[1].lower()
+    if ext not in (".xls", ".xlsx"):
+        raise HTTPException(status_code=400, detail="Formato no soportado")
+    tmp_path = os.path.join(TMP_DIR, f"upload_ni_{uuid.uuid4().hex[:8]}{ext}")
+    with open(tmp_path, "wb") as f:
+        f.write(await archivo.read())
+    try:
+        guardar_nuevo_ingreso(tmp_path, archivo.filename)
+    except ValueError as e:
+        return RedirectResponse(url=f"/datos?error={quote(str(e))}", status_code=303)
+    finally:
+        _eliminar_silenciosamente(tmp_path)
+    return RedirectResponse(url="/datos?ok=1", status_code=303)
+
+
+@app.post("/datos/nuevo-ingreso/eliminar")
+async def nuevo_ingreso_eliminar(request: Request):
+    bloqueo = _bloquear_si_no_admin(request)
+    if bloqueo: return bloqueo
+    eliminar_nuevo_ingreso()
     return RedirectResponse(url="/datos?ok=1", status_code=303)
 
 
@@ -689,156 +915,3 @@ async def generar_pdf(request: Request, bg: BackgroundTasks):
     cuenta = form.get("cuenta", "")
     return _generar_y_servir(p, valores, "pdf", basename=f"Constancia_{cuenta}", bg=bg)
 
-
-# ---------- Generación por lotes ----------
-
-# Campos que en el lote se derivan por alumno y NO se piden en el formulario
-# compartido (además de los HIDDEN): ver catalogo.PLACEHOLDERS_POR_ALUMNO.
-
-@app.get("/lote", response_class=HTMLResponse)
-async def lote_page(request: Request):
-    if get_rol(request) is None:
-        return _redir_a_login()
-    aj = cargar_ajustes()
-
-    slug = request.query_params.get("plantilla", "") or plantillas.default_slug()
-    p = plantillas.get(slug) if slug else None
-    info = p.info() if p and p.exists() else None
-    if not info:
-        return RedirectResponse(url="/?error=plantilla_no_encontrada", status_code=303)
-
-    # Campos compartidos: todo lo que no se deriva por alumno.
-    campos = [
-        c for c in catalogo.construir_campos_form(info["placeholders"], {}, aj, carreras)
-        if c["name"] not in catalogo.PLACEHOLDERS_POR_ALUMNO
-    ]
-    # ¿La plantilla trae líneas de promedio? (para mostrar los checkboxes)
-    tiene_promedios = any(
-        ph in info["placeholders"]
-        for ph in ("PROMEDIO_GENERAL_LINEA", "PROMEDIO_ULTIMO_LINEA")
-    )
-
-    return templates.TemplateResponse(request, "lote.html", {
-        "datos": datos_meta(),
-        "plantillas": plantillas.listar(),
-        "plantilla_slug": slug,
-        "campos": campos,
-        "tiene_promedios": tiene_promedios,
-        "ajustes": aj,
-    })
-
-
-@app.post("/lote/generar", response_class=HTMLResponse)
-async def lote_generar(request: Request):
-    if get_rol(request) is None:
-        return _redir_a_login()
-    form = await request.form()
-
-    p = _plantilla_de(form.get("plantilla", ""))
-    info = p.info() if p else None
-    if not info:
-        raise HTTPException(status_code=404, detail="Plantilla no encontrada")
-
-    formato = form.get("formato", "docx")
-    if formato not in ("docx", "pdf"):
-        formato = "docx"
-
-    # Cuentas: una por línea, o separadas por coma/espacio.
-    cuentas = [c for c in re.split(r"[\s,;]+", form.get("cuentas", "")) if c]
-    cuentas = list(dict.fromkeys(cuentas))[:200]  # únicas, máx. 200
-    if not cuentas:
-        return RedirectResponse(
-            url=f"/lote?plantilla={quote(form.get('plantilla', ''))}", status_code=303,
-        )
-
-    aj = cargar_ajustes()
-    compartidos = _form_a_valores(form, info["placeholders"])
-    incluir_prom_gral = form.get("incluir_promedio_general") == "on"
-    incluir_prom_ult = form.get("incluir_promedio_ultimo") == "on"
-
-    zip_uid = uuid.uuid4().hex[:12]
-    zip_path = os.path.join(TMP_DIR, f"lote_{zip_uid}.zip")
-    resultados = []
-
-    with zipfile.ZipFile(zip_path, "w", zipfile.ZIP_DEFLATED) as zf:
-        for cuenta in cuentas:
-            alumno = buscar_alumno(cuenta)
-            if not alumno:
-                resultados.append({"cuenta": cuenta, "nombre": "", "estado": "no_encontrado", "detalle": ""})
-                continue
-
-            por_alumno, faltantes = catalogo.valores_por_alumno(
-                info["placeholders"], alumno, aj, carreras,
-            )
-            # Checkboxes de promedios apagados → la línea se vacía y su
-            # párrafo desaparece del documento.
-            if not incluir_prom_gral and "PROMEDIO_GENERAL_LINEA" in info["placeholders"]:
-                por_alumno["PROMEDIO_GENERAL_LINEA"] = ""
-            if not incluir_prom_ult and "PROMEDIO_ULTIMO_LINEA" in info["placeholders"]:
-                por_alumno["PROMEDIO_ULTIMO_LINEA"] = ""
-
-            valores = {**compartidos, **por_alumno}
-            # Los faltantes (p. ej. género sin columna Sexo) se quitan del
-            # mapping: el placeholder queda visible en el documento como
-            # señal de que hay que completarlo a mano.
-            for ph in faltantes:
-                valores.pop(ph, None)
-
-            doc = render(p.path, valores, opcionales_vacios=catalogo.opcionales_de(valores.keys()))
-            base = f"Constancia_{cuenta}"
-            docx_tmp = os.path.join(TMP_DIR, f"{base}_{uuid.uuid4().hex[:8]}.docx")
-            doc.save(docx_tmp)
-            try:
-                if formato == "pdf":
-                    pdf_tmp = docx_a_pdf(docx_tmp, TMP_DIR)
-                    zf.write(pdf_tmp, f"{base}.pdf")
-                    _eliminar_silenciosamente(pdf_tmp)
-                else:
-                    zf.write(docx_tmp, f"{base}.docx")
-            except ConversionError as e:
-                resultados.append({
-                    "cuenta": cuenta,
-                    "nombre": derivar.formato_nombre(alumno.get("NombreAlumno", "")),
-                    "estado": "error_pdf", "detalle": str(e)[:200],
-                })
-                _eliminar_silenciosamente(docx_tmp)
-                continue
-            finally:
-                _eliminar_silenciosamente(docx_tmp)
-
-            resultados.append({
-                "cuenta": cuenta,
-                "nombre": derivar.formato_nombre(alumno.get("NombreAlumno", "")),
-                "estado": "revisar" if faltantes else "ok",
-                "detalle": ", ".join(f"[[{f}]]" for f in faltantes),
-            })
-
-    generadas = sum(1 for r in resultados if r["estado"] in ("ok", "revisar"))
-    return templates.TemplateResponse(request, "lote.html", {
-        "datos": datos_meta(),
-        "plantillas": plantillas.listar(),
-        "plantilla_slug": form.get("plantilla", ""),
-        "campos": [],
-        "tiene_promedios": False,
-        "ajustes": aj,
-        "resultado": {
-            "resultados": resultados,
-            "generadas": generadas,
-            "formato": formato,
-            "zip": f"/lote/zip/{zip_uid}" if generadas else "",
-        },
-    })
-
-
-@app.get("/lote/zip/{uid}")
-async def lote_zip(request: Request, uid: str, bg: BackgroundTasks):
-    if get_rol(request) is None:
-        return _redir_a_login()
-    if not re.fullmatch(r"[0-9a-f]{12}", uid):
-        raise HTTPException(status_code=404, detail="Lote no encontrado")
-    zip_path = os.path.join(TMP_DIR, f"lote_{uid}.zip")
-    if not os.path.exists(zip_path):
-        raise HTTPException(status_code=404, detail="Ese lote ya expiró; genera uno nuevo.")
-    fecha = datetime.now().strftime("%Y-%m-%d")
-    return FileResponse(zip_path, media_type="application/zip",
-                        filename=f"Constancias_{fecha}.zip")

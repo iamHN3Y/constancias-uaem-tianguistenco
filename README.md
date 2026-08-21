@@ -2,17 +2,19 @@
 
 Aplicación web (FastAPI) para generar constancias escolares en `.docx` y `.pdf` desde una **plantilla universal** con placeholders `[[CAMPO]]`. Se distribuye como una imagen Docker.
 
+> **Documentación completa**: [docs/INDEX.md](docs/INDEX.md) — manual de usuario para personal administrativo y documentación técnica con diagramas de arquitectura para quien mantenga el código.
+
 ## Características
 
 - Carga de un padrón de alumnos (`.xls`, `.xlsx`, `.csv`) que persiste hasta que se reemplace.
 - Búsqueda de alumno por número de cuenta **o por nombre** (sin importar acentos ni mayúsculas).
 - **Varias plantillas con nombre** (constancia general, inglés, prácticas…), cada una con su historial.
-- **Generación por lotes**: pega una lista de cuentas y descarga todas las constancias en un ZIP (.docx o .pdf).
+- **Alumnos de nuevo ingreso**: archivo secundario (Excel de control escolar) para alumnos que aún no están en el padrón principal; se consulta solo como respaldo y el padrón principal siempre tiene prioridad.
 - **Catálogo de carreras editable desde la UI** (`/carreras`): altas de carreras y duraciones de plan sin tocar código.
 - Género prellenado desde la columna `Sexo` del Excel (acepta M/F, H/M, MASCULINO/FEMENINO, HOMBRE/MUJER).
 - Vista previa PDF en vivo (iframe) con cada cambio del formulario.
 - Selectores de fecha para periodo de inicio/fin, fecha de expedición y periodo vacacional — el texto formal en español se deriva en el backend.
-- **Fechas del semestre configurables una sola vez**: el admin guarda inicio/fin del periodo junto con el periodo activo y todas las constancias (individuales y por lote) salen prellenadas; el semestre en letra se calcula solo comparando el periodo de ingreso del alumno con el periodo activo.
+- **Fechas del semestre configurables una sola vez**: el admin guarda inicio/fin del periodo junto con el periodo activo y todas las constancias salen prellenadas; el semestre en letra se calcula solo comparando el periodo de ingreso del alumno con el periodo activo.
 - Líneas opcionales (promedios, periodo vacacional, línea libre) que **se eliminan automáticamente** del documento si quedan vacías.
 - Catálogo de **comodines** (snippets reutilizables) para la línea libre.
 - Pseudo-login con dos roles: **admin** (carga datos y plantilla) e **invitado** (solo genera).
@@ -126,7 +128,7 @@ La contraseña admin se lee de la variable `ADMIN_PASSWORD` al arranque (default
 
 Puede haber **varias plantillas** (p. ej. "Constancia general", "Constancia en inglés", "Prácticas profesionales"). Cada una vive en su propia carpeta `data/plantillas/<slug>/universal.docx`, con su historial y su cache de placeholders. El registro de nombres está en `data/plantillas/registro.json`. Si vienes de una versión anterior (un solo `universal.docx` suelto), la migración al nuevo layout es automática al arrancar.
 
-Cuando hay más de una plantilla, en la pantalla principal (y en el lote) aparece un selector de "Tipo de constancia".
+Cuando hay más de una plantilla, en la pantalla principal aparece un selector de "Tipo de constancia".
 
 Para editar una plantilla:
 
@@ -162,7 +164,7 @@ Cada reemplazo de plantilla guarda una copia de la anterior en `data/plantillas/
 En la pantalla principal (solo admin) se configura **una vez por semestre**:
 
 - **Periodo** (ej. `2026A`): con él se calcula el semestre en letra de cada alumno (`PerInicio` 2023B + periodo 2026A → "sexto").
-- **Inicio y fin del periodo**: fechas reales del calendario escolar. Prellenan los campos «Inicio/Fin del periodo» de todas las constancias, individuales y por lote. Si se dejan vacías se usan las fechas típicas (02 de febrero / 02 de agosto) como aproximación, siempre editables en cada constancia.
+- **Inicio y fin del periodo**: fechas reales del calendario escolar. Prellenan los campos «Inicio/Fin del periodo» de todas las constancias. Si se dejan vacías se usan las fechas típicas (02 de febrero / 02 de agosto) como aproximación, siempre editables en cada constancia.
 
 Si no hay periodo activo configurado, la página de generación lo avisa (es la causa típica de que «Semestre» y las fechas aparezcan vacíos).
 
@@ -175,14 +177,6 @@ Convierte el plan del Excel (`ICO-F19`) en el nombre completo de la carrera y de
 
 Los cambios aplican de inmediato, sin reiniciar. El archivo también se puede editar a mano si hiciera falta.
 
-## Generación por lotes (`/lote`)
-
-Pega una lista de cuentas (una por línea o separadas por comas, máx. 200), elige plantilla y formato (.docx o .pdf) y descarga un ZIP. Lo individual (nombre, carrera, semestre, género, promedios) se deriva solo del Excel; las fechas y líneas opcionales se definen una vez para todo el lote. El resumen final marca por alumno:
-
-- **generada** — todo derivado correctamente.
-- **revisar** — se generó pero quedaron placeholders sin dato visibles en el documento (p. ej. `[[ARTICULO]]` si el padrón no trae columna `Sexo`); ábrela en Word o genera esa cuenta individual.
-- **cuenta no encontrada** — no está en el padrón.
-
 ## Datos de alumnos
 
 Al subir el padrón:
@@ -191,7 +185,17 @@ Al subir el padrón:
 - Un archivo sin columna `Cuenta`, vacío o ilegible se **rechaza con un mensaje claro** y los datos anteriores quedan intactos.
 - Las cuentas que Excel entrega como número flotante (`2014694.0`) se normalizan solas.
 - Si `PrmGR`/`Per` traen valores no numéricos, las líneas de promedio simplemente quedan vacías (editables a mano) en lugar de fallar.
-- Si existe columna `Sexo`, el género se prellena en el formulario y se deriva en los lotes. Se aceptan los esquemas M/F, H/M, MASCULINO/FEMENINO y HOMBRE/MUJER; la letra `M` ambigua se interpreta según el esquema del propio archivo.
+- Si existe columna `Sexo`, el género se prellena en el formulario. Se aceptan los esquemas M/F, H/M, MASCULINO/FEMENINO y HOMBRE/MUJER; la letra `M` ambigua se interpreta según el esquema del propio archivo.
+- La pantalla `/datos` incluye un panel de salud de solo lectura: total de alumnos, cuántos no tienen columna `Sexo` (o la tienen vacía), y cuántos alumnos solo existen en el archivo de nuevo ingreso.
+
+### Alumnos de nuevo ingreso
+
+Archivo secundario (`data/nuevo_ingreso.csv`), cargado desde un Excel de control escolar sin fila de encabezado (columnas posicionales: Cuenta, Apellido paterno, Apellido materno, Nombre(s), Plan, Periodo). Reglas:
+
+- Se consulta **solo como respaldo**: si la cuenta ya está en el padrón principal (`datos.csv`), ese siempre gana. Nunca se fusiona con el padrón principal.
+- El nombre se compone como `"APELLIDOS / NOMBRES"` (mismo formato que el padrón real), tolerando apellido materno vacío.
+- Al subir un padrón principal nuevo, las cuentas que ya aparezcan ahí se **purgan automáticamente** de `nuevo_ingreso.csv` (evita duplicados fantasma cuando un alumno de nuevo ingreso avanza de semestre).
+- La búsqueda por cuenta y por nombre completan resultados desde este archivo cuando no hay coincidencia en el padrón principal; los resultados de nuevo ingreso no se repiten si la cuenta ya salió del padrón.
 
 ## Tests
 
@@ -220,12 +224,13 @@ constancias_app/
 │   ├── plantilla_universal.py       # plantillas con nombre + historial + cache autovalidado
 │   ├── comodines.py                 # snippets reutilizables (con lock)
 │   ├── bootstrap_plantillas/        # plantilla seed para el primer arranque
-│   ├── templates/                   # Jinja2: login, home, datos, plantillas, carreras, generar, lote
+│   ├── templates/                   # Jinja2: login, home, datos, plantillas, carreras, generar
 │   └── static/                      # CSS y JS
 ├── tests/                           # pytest: render, plantillas, catálogo, carreras, API
 └── data/                            # montado como volumen (persistente)
     ├── ajustes.json                 # periodo activo + meta del CSV
     ├── datos.csv                    # padrón de alumnos
+    ├── nuevo_ingreso.csv            # respaldo: alumnos aún no en el padrón principal
     ├── comodines.json               # generado en runtime
     ├── carreras.json                # catálogo de carreras (editable desde /carreras)
     ├── plantillas/

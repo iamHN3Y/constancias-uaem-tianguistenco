@@ -63,6 +63,13 @@
   --radius-pill: 999px;
 
   --field-bg: var(--surface);
+
+  /* Tokens de movimiento */
+  --dur-fast: 120ms;
+  --dur-base: 220ms;
+  --dur-slow: 380ms;
+  --ease-emph: cubic-bezier(.2,0,0,1);
+  --ease-exit: cubic-bezier(.4,0,1,1);
 }
 
 /* ---------- Design tokens: tema OSCURO ---------- */
@@ -184,6 +191,8 @@ a:hover{ text-decoration: underline; }
   margin-bottom: 16px;
 }
 
+.card:focus-visible{ outline: 3px solid color-mix(in srgb, var(--primary) 35%, transparent); outline-offset: 2px; }
+
 .card h2{
   margin: 0 0 6px;
   font-size: 18px;
@@ -255,6 +264,7 @@ textarea:disabled, input:disabled{
 input[type="text"],
 input[type="password"],
 input[type="date"],
+input[type="number"],
 input[type="file"],
 select,
 textarea{
@@ -277,12 +287,14 @@ input::placeholder, textarea::placeholder{ color: var(--on-surface-variant); opa
 input[type="text"]:hover,
 input[type="password"]:hover,
 input[type="date"]:hover,
+input[type="number"]:hover,
 select:hover,
 textarea:hover{ border-color: var(--outline); }
 
 input[type="text"]:focus,
 input[type="password"]:focus,
 input[type="date"]:focus,
+input[type="number"]:focus,
 input[type="file"]:focus,
 select:focus,
 textarea:focus{
@@ -431,6 +443,11 @@ button svg, .btn svg, a.btn svg,
 .chip svg{ width: 16px; height: 16px; fill: currentColor; }
 .chip-primary{ background: var(--primary-container); color: var(--on-primary-container); border-color: transparent; }
 
+.field-tag{
+  font-size: 11px; font-weight: 600; color: var(--on-secondary-container);
+  background: var(--secondary-container); padding: 1px 8px; border-radius: var(--radius-pill);
+}
+
 /* ---------- Banner / nota ---------- */
 .note{
   display: flex;
@@ -545,3 +562,165 @@ html[data-theme="dark"] .note-error svg{ fill: var(--on-error-container); }
 /* ---------- Utilidades ---------- */
 .muted{ color: var(--on-surface-variant); }
 .stack-sm > * + *{ margin-top: 8px; }
+
+/* ---------- Skeleton (placeholder de carga) ---------- */
+.skeleton{
+  position: relative;
+  overflow: hidden;
+  background: var(--surface-2);
+  background-image: linear-gradient(
+    100deg,
+    transparent 30%,
+    color-mix(in srgb, var(--on-surface) 8%, transparent) 50%,
+    transparent 70%
+  );
+  background-size: 200% 100%;
+  animation: skeleton-shimmer 1.4s ease-in-out infinite;
+}
+@keyframes skeleton-shimmer{
+  0%{ background-position: 140% 0; }
+  100%{ background-position: -40% 0; }
+}
+
+/* ---------- Snackbar ---------- */
+.snackbar-region{
+  position: fixed;
+  left: 50%;
+  bottom: 20px;
+  transform: translateX(-50%);
+  z-index: 2000;
+  display: flex;
+  flex-direction: column-reverse;
+  gap: 10px;
+  align-items: center;
+  width: min(420px, calc(100vw - 32px));
+}
+.snackbar{
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 16px;
+  border-radius: var(--radius-sm);
+  background: var(--on-surface);
+  color: var(--surface);
+  box-shadow: var(--elev-3);
+  font-size: 14px;
+  font-weight: 500;
+  animation: snackbar-in var(--dur-base) var(--ease-emph);
+}
+.snackbar.snackbar--saliendo{
+  animation: snackbar-out var(--dur-fast) var(--ease-exit) forwards;
+}
+.snackbar-exito{ background: var(--primary); color: var(--on-primary); }
+.snackbar-error{ background: var(--error); color: var(--on-error); }
+@keyframes snackbar-in{
+  from{ opacity: 0; transform: translateY(16px) scale(.96); }
+  to{ opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes snackbar-out{
+  from{ opacity: 1; transform: translateY(0) scale(1); }
+  to{ opacity: 0; transform: translateY(10px) scale(.96); }
+}
+
+/* ---------- Dialog (confirmaciones) ---------- */
+dialog{
+  border: none;
+  padding: 0;
+  max-width: 420px;
+  width: calc(100vw - 40px);
+  border-radius: var(--radius-md);
+  background: var(--surface-1);
+  color: var(--on-surface);
+  box-shadow: var(--elev-3);
+  animation: dialog-in var(--dur-base) var(--ease-emph);
+}
+dialog[open]::backdrop{
+  background: rgba(0,0,0,.5);
+  animation: dialog-backdrop-in var(--dur-base) var(--ease-emph);
+}
+@keyframes dialog-in{
+  from{ opacity: 0; transform: scale(.94); }
+  to{ opacity: 1; transform: scale(1); }
+}
+@keyframes dialog-backdrop-in{
+  from{ opacity: 0; }
+  to{ opacity: 1; }
+}
+.dialog-body{ padding: 22px; }
+.dialog-body h3{ margin: 0 0 8px; font-size: 17px; font-weight: 700; }
+.dialog-body p{ margin: 0 0 16px; font-size: 14px; color: var(--on-surface-variant); line-height: 1.5; }
+.dialog-body .field{ margin-bottom: 16px; }
+.dialog-actions{ display: flex; justify-content: flex-end; gap: 10px; }
+
+.dialog-danger .dialog-confirmar{
+  --_bg: var(--error);
+  --_fg: var(--on-error);
+}
+
+/* ---------- Tarjeta protagonista ---------- */
+.card--protagonista{
+  border-color: var(--primary);
+  box-shadow: var(--elev-2), 0 0 0 1px color-mix(in srgb, var(--primary) 25%, transparent);
+}
+
+/* ---------- Entrada escalonada ---------- */
+.entrada-escalonada{
+  animation: entrada-fade var(--dur-slow) var(--ease-emph) both;
+  animation-delay: calc(var(--i, 0) * 60ms);
+}
+@keyframes entrada-fade{
+  from{ opacity: 0; transform: translateY(10px); }
+  to{ opacity: 1; transform: translateY(0); }
+}
+
+/* ---------- kbd ---------- */
+kbd{
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  border: 1px solid var(--outline-variant);
+  background: var(--surface);
+  color: var(--on-surface-variant);
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 12px;
+  font-weight: 600;
+  box-shadow: 0 1px 0 var(--outline-variant);
+}
+
+/* ---------- Botones con estado ocupado (descarga) ---------- */
+button[aria-busy="true"]{
+  color: transparent;
+  pointer-events: none;
+  position: relative;
+}
+button[aria-busy="true"] svg{ visibility: hidden; }
+button[aria-busy="true"]::after{
+  content: "";
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 16px;
+  height: 16px;
+  margin: -8px 0 0 -8px;
+  border-radius: 50%;
+  border: 2px solid currentColor;
+  border-top-color: transparent;
+  color: var(--_fg, currentColor);
+  animation: btn-spin .7s linear infinite;
+}
+@keyframes btn-spin{ to{ transform: rotate(360deg); } }
+
+/* ---------- Accesibilidad: movimiento reducido ---------- */
+@media (prefers-reduced-motion: reduce){
+  *, *::before, *::after, ::backdrop{
+    animation-duration: .01ms !important;
+    animation-delay: -1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
