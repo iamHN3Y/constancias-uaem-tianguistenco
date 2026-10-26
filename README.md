@@ -211,22 +211,25 @@ Cubren el motor de render (placeholders partidos en runs, headers/footers, tabla
 
 ```
 constancias_app/
-├── Dockerfile                       # python:3.11-slim + libreoffice-writer
+├── Dockerfile                       # build multi-stage: node (frontend) + python:3.11-slim + libreoffice-writer
 ├── README.md
 ├── requirements.txt
 ├── app/
-│   ├── main.py                      # endpoints FastAPI
+│   ├── main.py                      # lógica de dominio + montaje de la API y de la SPA compilada
+│   ├── api.py                       # router JSON /api/v1/* (handlers delgados sobre el dominio)
 │   ├── catalogo.py                  # placeholders well-known + convenciones (tipo_de)
 │   ├── carreras.py                  # catálogo editable de carreras y duraciones
 │   ├── derivar.py                   # texto formal en español (fechas, números, género)
 │   ├── docx_render.py               # detección y reemplazo de placeholders
-│   ├── pdf.py                       # docx → pdf vía LibreOffice headless
+│   ├── pdf.py                       # docx → pdf vía LibreOffice headless (async, threadpool + semáforo)
 │   ├── plantilla_universal.py       # plantillas con nombre + historial + cache autovalidado
 │   ├── comodines.py                 # snippets reutilizables (con lock)
-│   ├── bootstrap_plantillas/        # plantilla seed para el primer arranque
-│   ├── templates/                   # Jinja2: login, home, datos, plantillas, carreras, generar
-│   └── static/                      # CSS y JS
-├── tests/                           # pytest: render, plantillas, catálogo, carreras, API
+│   └── bootstrap_plantillas/        # plantilla seed para el primer arranque
+├── frontend/                        # SPA React + TypeScript (Vite, React Router, TanStack Query, Framer Motion)
+│   └── src/
+│       ├── pages/                   # Login, Home, Generar, Datos, Plantillas, Carreras
+│       ├── components/, context/, api/, styles/
+├── tests/                           # pytest: render, plantillas, catálogo, carreras, API JSON
 └── data/                            # montado como volumen (persistente)
     ├── ajustes.json                 # periodo activo + meta del CSV
     ├── datos.csv                    # padrón de alumnos

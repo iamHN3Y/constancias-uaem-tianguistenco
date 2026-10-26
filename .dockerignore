@@ -1,0 +1,23 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+.pytest_cache/
+
+# Frontend (se reconstruye en la etapa de build; node_modules/dist locales no se copian)
+frontend/node_modules/
+frontend/dist/
+
+# Git / harness
+.git/
+.gitignore
+.claude/
+
+# Datos (se montan como volumen, no deben quedar horneados en la imagen)
+data/
+
+# Docs / misceláneo
+*.md
+docs/

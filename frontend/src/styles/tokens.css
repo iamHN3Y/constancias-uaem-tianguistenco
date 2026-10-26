@@ -1,0 +1,152 @@
+/* ============================================================
+   Generador de Constancias — Material Design 3 (React)
+   Tokens portados 1:1 de app/static/styles.css para preservar la
+   identidad visual institucional UAEM Tianguistenco:
+     Verde (Pantone 350 C)  #2C5234  → color primario
+     Oro   (Pantone 112 C)  #9C8412  → color secundario
+   ============================================================ */
+
+/* ---------- Design tokens: tema CLARO (default) ---------- */
+:root {
+  --green: #2c5234;
+  --gold: #9c8412;
+
+  --primary: #2c5234;
+  --on-primary: #ffffff;
+  --primary-container: #cce8d1;
+  --on-primary-container: #0a2912;
+
+  --secondary: #7c6a0e;
+  --on-secondary: #ffffff;
+  --secondary-container: #f1e7bf;
+  --on-secondary-container: #262100;
+
+  --background: #f8faf5;
+  --surface: #fbfdf7;
+  --surface-1: #f1f5ec;
+  --surface-2: #eaf0e3;
+  --surface-variant: #dde5d6;
+  --on-surface: #181d17;
+  --on-surface-variant: #424a3f;
+
+  --outline: #72796d;
+  --outline-variant: #c2cabb;
+
+  --error: #ba1a1a;
+  --on-error: #ffffff;
+  --error-container: #ffdad6;
+  --on-error-container: #410002;
+
+  --appbar-bg: #eef3e8;
+
+  --elev-1: 0 1px 2px rgba(0, 0, 0, 0.3), 0 1px 3px 1px rgba(0, 0, 0, 0.1);
+  --elev-2: 0 1px 2px rgba(0, 0, 0, 0.3), 0 2px 6px 2px rgba(0, 0, 0, 0.12);
+  --elev-3: 0 4px 8px 3px rgba(0, 0, 0, 0.12), 0 1px 3px rgba(0, 0, 0, 0.3);
+
+  --radius-xs: 8px;
+  --radius-sm: 12px;
+  --radius-md: 16px;
+  --radius-lg: 28px;
+  --radius-pill: 999px;
+
+  --field-bg: var(--surface);
+
+  --dur-fast: 120ms;
+  --dur-base: 220ms;
+  --dur-slow: 380ms;
+  --ease-emph: cubic-bezier(0.2, 0, 0, 1);
+  --ease-exit: cubic-bezier(0.4, 0, 1, 1);
+}
+
+/* ---------- Design tokens: tema OSCURO ---------- */
+html[data-theme="dark"] {
+  --primary: #8fd69b;
+  --on-primary: #00391a;
+  --primary-container: #1f4a2c;
+  --on-primary-container: #abf2b6;
+
+  --secondary: #dcc54c;
+  --on-secondary: #3a3000;
+  --secondary-container: #544600;
+  --on-secondary-container: #f9e287;
+
+  --background: #10140f;
+  --surface: #10140f;
+  --surface-1: #1a1f17;
+  --surface-2: #20261d;
+  --surface-variant: #424a3f;
+  --on-surface: #e1e4db;
+  --on-surface-variant: #c2cabb;
+
+  --outline: #8c9387;
+  --outline-variant: #424a3f;
+
+  --error: #ffb4ab;
+  --on-error: #690005;
+  --error-container: #93000a;
+  --on-error-container: #ffdad6;
+
+  --appbar-bg: #1a1f17;
+
+  --elev-1: 0 1px 2px rgba(0, 0, 0, 0.45), 0 1px 3px 1px rgba(0, 0, 0, 0.3);
+  --elev-2: 0 1px 2px rgba(0, 0, 0, 0.45), 0 2px 6px 2px rgba(0, 0, 0, 0.3);
+  --elev-3: 0 4px 8px 3px rgba(0, 0, 0, 0.3), 0 1px 3px rgba(0, 0, 0, 0.45);
+
+  --field-bg: #161b13;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+html,
+body,
+#root {
+  height: 100%;
+  min-height: 100%;
+}
+
+html {
+  background: radial-gradient(1100px 520px at 12% -5%, rgba(44, 82, 52, 0.1), transparent 60%),
+    radial-gradient(900px 480px at 95% 0%, rgba(156, 132, 18, 0.1), transparent 55%), var(--background);
+  background-attachment: fixed;
+  background-repeat: no-repeat;
+  background-size: cover;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  color: var(--on-surface);
+  background: transparent;
+  line-height: 1.5;
+  letter-spacing: 0.1px;
+}
+
+a {
+  color: var(--primary);
+  text-decoration: none;
+  font-weight: 500;
+}
+a:hover {
+  text-decoration: underline;
+}
+
+::selection {
+  background: var(--primary-container);
+  color: var(--on-primary-container);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: -1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

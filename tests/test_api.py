@@ -1,5 +1,5 @@
 """
-Test de integración de la API completa (sin LibreOffice: solo .docx).
+Test de integración de la API JSON (/api/v1/*) — sin LibreOffice: solo .docx.
 
 Recorre el flujo real: login → subir plantilla(s) → subir datos → generar,
 incluyendo los escenarios de longevidad: comodines nuevos en la plantilla,
@@ -17,6 +17,8 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")
 
 REPO_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 EXCEL_NUEVO_INGRESO = os.path.join(REPO_ROOT, "data", "Alumnos de nuevo ingreso 26B.xlsx")
+
+API = "/api/v1"
 
 
 def docx_bytes(*parrafos: str) -> bytes:
@@ -72,42 +74,40 @@ CSV_OK = (
 
 def _crear_plantilla(client, nombre, contenido):
     return client.post(
-        "/plantillas/crear",
+        f"{API}/plantillas/crear",
         data={"nombre": nombre},
         files={"archivo": ("t.docx", contenido)},
-        follow_redirects=False,
     )
 
 
 def _subir_datos(client, csv=CSV_OK):
-    return client.post("/datos/upload", files={"archivo": ("d.csv", csv.encode())},
-                       follow_redirects=False)
+    return client.post(f"{API}/datos/upload", files={"archivo": ("d.csv", csv.encode())})
 
 
 def test_flujo_completo(client):
-    m = client.modulo
-
     r = _crear_plantilla(client, "Constancia general", docx_bytes(
         "Constancia de [[ARTICULO]] [[NOMBRE_COMPLETO]] cuenta [[CUENTA]] de [[CARRERA_FULL]]",
         "[[COMODIN_NUEVO]]",
         "[[BECA_LINEA]]",
         "Examen: [[EXAMEN_FECHA]]",
     ))
-    assert "ok=creada" in r.headers["location"]
+    assert r.status_code == 200 and r.json()["slug"] == "constancia-general"
 
     r = _subir_datos(client)
-    assert "ok=1" in r.headers["location"]
+    assert r.status_code == 200 and r.json()["ok"] is True
 
     # El formulario muestra el comodín nuevo, la fecha por convención y el
     # género prellenado desde la columna Sexo.
-    r = client.get("/generar", params={"cuenta": "2014694"})
+    r = client.get(f"{API}/generar/campos", params={"cuenta": "2014694"})
     assert r.status_code == 200
-    for esperado in ("COMODIN_NUEVO", "BECA_LINEA", "fecha_EXAMEN_FECHA"):
-        assert esperado in r.text
-    assert 'value="M" required checked' in r.text.replace("  ", " ")
+    data = r.json()
+    nombres = {c["name"] for c in data["campos"]}
+    assert {"COMODIN_NUEVO", "BECA_LINEA", "EXAMEN_FECHA"} <= nombres
+    genero_campo = next(c for c in data["campos"] if c["name"] == "ARTICULO")
+    assert genero_campo["genero"] == "M"
 
     # Generar .docx.
-    r = client.post("/generar/docx", data={
+    r = client.post(f"{API}/generar/docx", data={
         "cuenta": "2014694",
         "plantilla": "constancia-general",
         "__genero__": "M",
@@ -126,6 +126,57 @@ def test_flujo_completo(client):
     assert "BECA_LINEA" not in textos
 
 
+def test_smoke_login_buscar_generar_end_to_end(client):
+    """Test de humo adicional: login JSON → buscar → generar .docx → abrir con
+    python-docx y verificar el texto. Reemplaza la cookie de sesión existente
+    para probar el flujo de login real."""
+    client.cookies.clear()
+
+    r = client.post(f"{API}/login", json={"rol": "admin", "password": "admin2026"})
+    assert r.status_code == 200 and r.json()["rol"] == "admin"
+    assert client.cookies.get("rol") == "admin"
+
+    _crear_plantilla(client, "Constancia general", docx_bytes(
+        "Constancia de [[ARTICULO]] [[NOMBRE_COMPLETO]] cuenta [[CUENTA]]",
+    ))
+    _subir_datos(client)
+
+    r = client.post(f"{API}/buscar", json={"cuenta": "2014694"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["tipo"] == "cuenta"
+    assert body["alumno"]["NombreAlumno"] == "PÉREZ / JUAN"
+
+    r = client.post(f"{API}/generar/docx", data={
+        "cuenta": "2014694",
+        "plantilla": "constancia-general",
+        "__genero__": "M",
+        "campo_NOMBRE_COMPLETO": "PÉREZ JUAN",
+        "campo_CUENTA": "2014694",
+    })
+    assert r.status_code == 200
+    textos = "\n".join(p.text for p in Document(io.BytesIO(r.content)).paragraphs)
+    assert "Constancia de el alumno PÉREZ JUAN cuenta 2014694" in textos
+
+    r = client.post(f"{API}/logout")
+    assert r.status_code == 200
+    assert client.cookies.get("rol") is None
+
+
+def test_login_password_incorrecta(client):
+    client.cookies.clear()
+    r = client.post(f"{API}/login", json={"rol": "admin", "password": "mala"})
+    assert r.status_code == 401
+    assert "error" in r.json()
+
+
+def test_sesion_requerida_devuelve_401(client):
+    client.cookies.clear()
+    r = client.get(f"{API}/home")
+    assert r.status_code == 401
+    assert "error" in r.json()
+
+
 def test_ajustes_periodo_con_fechas(client):
     """El admin guarda periodo + fechas una vez; el formulario sale
     prellenado con ellas, y el semestre se calcula solo."""
@@ -134,28 +185,30 @@ def test_ajustes_periodo_con_fechas(client):
     ))
     _subir_datos(client)
 
-    r = client.post("/ajustes", data={
+    r = client.post(f"{API}/ajustes", json={
         "periodo_actual": "2026A",
         "periodo_inicio": "2026-02-09",
         "periodo_fin": "2026-07-24",
-    }, follow_redirects=False)
-    assert r.status_code == 303 and "error" not in r.headers["location"]
+    })
+    assert r.status_code == 200
 
     # Formulario individual: fechas guardadas + semestre calculado
     # (PerInicio 2023B → 2026A = sexto).
-    r = client.get("/generar", params={"cuenta": "2014694"})
-    assert 'value="2026-02-09"' in r.text
-    assert 'value="2026-07-24"' in r.text
-    assert 'value="sexto"' in r.text
+    r = client.get(f"{API}/generar/campos", params={"cuenta": "2014694"})
+    campos = {c["name"]: c for c in r.json()["campos"]}
+    assert campos["PERIODO_INICIO"]["iso"] == "2026-02-09"
+    assert campos["PERIODO_FIN"]["iso"] == "2026-07-24"
+    assert campos["SEMESTRE_TEXTO"]["valor"] == "sexto"
 
 
 def test_ajustes_rechaza_fechas_invertidas(client):
-    r = client.post("/ajustes", data={
+    r = client.post(f"{API}/ajustes", json={
         "periodo_actual": "2026A",
         "periodo_inicio": "2026-07-24",
         "periodo_fin": "2026-02-09",
-    }, follow_redirects=False)
-    assert "error_ajustes=" in r.headers["location"]
+    })
+    assert r.status_code == 400
+    assert "error" in r.json()
 
 
 def test_busqueda_por_nombre(client):
@@ -163,13 +216,15 @@ def test_busqueda_por_nombre(client):
     _subir_datos(client)
 
     # 'garcia ana' encuentra a GARCÍA / ANA MARÍA sin acentos ni mayúsculas.
-    r = client.post("/buscar", data={"cuenta": "garcia ana", "plantilla": "general"},
-                    follow_redirects=True)
-    assert "GARCÍA / ANA MARÍA" in r.text
-    assert "/generar?cuenta=2015000" in r.text
+    r = client.post(f"{API}/buscar", json={"cuenta": "garcia ana", "plantilla": "general"})
+    assert r.status_code == 200
+    body = r.json()
+    assert body["tipo"] == "nombre"
+    nombres = [x["NombreAlumno"] for x in body["resultados"]]
+    assert "GARCÍA / ANA MARÍA" in nombres
 
-    r = client.post("/buscar", data={"cuenta": "nadie asi"}, follow_redirects=True)
-    assert "Ningún alumno coincide" in r.text
+    r = client.post(f"{API}/buscar", json={"cuenta": "nadie asi"})
+    assert r.json()["resultados"] == []
 
 
 def test_multiples_plantillas_y_seleccion(client):
@@ -177,7 +232,7 @@ def test_multiples_plantillas_y_seleccion(client):
     _crear_plantilla(client, "En inglés", docx_bytes("EN: [[NOMBRE_COMPLETO]]"))
     _subir_datos(client)
 
-    r = client.post("/generar/docx", data={
+    r = client.post(f"{API}/generar/docx", data={
         "cuenta": "2014694", "plantilla": "en-ingles",
         "campo_NOMBRE_COMPLETO": "JUAN",
     })
@@ -185,44 +240,43 @@ def test_multiples_plantillas_y_seleccion(client):
     assert "EN: JUAN" in textos
 
     # Eliminar una plantilla funciona; la última no se puede.
-    r = client.post("/plantillas/en-ingles/eliminar", follow_redirects=False)
-    assert "ok=eliminada" in r.headers["location"]
-    r = client.post("/plantillas/general/eliminar", follow_redirects=False)
-    assert "error=" in r.headers["location"]
+    r = client.post(f"{API}/plantillas/en-ingles/eliminar")
+    assert r.status_code == 200 and r.json()["ok"] is True
+    r = client.post(f"{API}/plantillas/general/eliminar")
+    assert r.status_code == 400
+    assert "error" in r.json()
 
 
 def test_carreras_endpoint_y_efecto_en_generar(client):
-    m = client.modulo
     _crear_plantilla(client, "General", docx_bytes("[[CARRERA_FULL]]"))
     _subir_datos(client)
 
     # El plan XYZ-F30 no está en el catálogo: aparece crudo.
-    r = client.get("/generar", params={"cuenta": "2016000"})
-    assert "XYZ-F30" in r.text
+    r = client.get(f"{API}/generar/campos", params={"cuenta": "2016000"})
+    campos = {c["name"]: c for c in r.json()["campos"]}
+    assert campos["CARRERA_FULL"]["valor"] == "XYZ-F30"
 
     # El admin da de alta la carrera desde la UI…
-    r = client.post("/carreras/carrera",
-                    data={"codigo": "XYZ", "nombre": "LICENCIATURA EN PRUEBAS"},
-                    follow_redirects=False)
-    assert "ok=1" in r.headers["location"]
+    r = client.post(f"{API}/carreras/carrera", json={"codigo": "XYZ", "nombre": "LICENCIATURA EN PRUEBAS"})
+    assert r.status_code == 200
 
     # …y el formulario la usa de inmediato, sin reiniciar.
-    r = client.get("/generar", params={"cuenta": "2016000"})
-    assert "LICENCIATURA EN PRUEBAS" in r.text
+    r = client.get(f"{API}/generar/campos", params={"cuenta": "2016000"})
+    campos = {c["name"]: c for c in r.json()["campos"]}
+    assert campos["CARRERA_FULL"]["valor"] == "LICENCIATURA EN PRUEBAS"
 
 
 def test_subidas_corruptas_no_rompen_nada(client):
     m = client.modulo
     _crear_plantilla(client, "General", docx_bytes("[[BUENO]]"))
 
-    r = client.post("/plantillas/general/upload",
-                    files={"archivo": ("malo.docx", b"garbage")}, follow_redirects=False)
-    assert "error=" in r.headers["location"]
+    r = client.post(f"{API}/plantillas/general/upload", files={"archivo": ("malo.docx", b"garbage")})
+    assert r.status_code == 400
     assert m.plantillas.get("general").info()["placeholders"] == ["BUENO"]
 
     _subir_datos(client)
     r = _subir_datos(client, csv="a,b\n1,2\n")
-    assert "error=" in r.headers["location"]
+    assert r.status_code == 400
     assert m.buscar_alumno("2014694") is not None  # datos previos intactos
 
 
@@ -232,25 +286,24 @@ def test_edicion_directa_en_disco_refresca_placeholders(client):
     p = m.plantillas.get("general")
     with open(p.path, "wb") as f:
         f.write(docx_bytes("[[VIEJO]] [[COMODIN_NUEVO]]"))
-    r = client.get("/plantillas")
-    assert "COMODIN_NUEVO" in r.text
+    r = client.get(f"{API}/plantillas")
+    placeholders = r.json()["items"][0]["info"]["placeholders"]
+    assert "COMODIN_NUEVO" in placeholders
 
 
 def test_historial_restauracion_y_descarga(client):
     m = client.modulo
     _crear_plantilla(client, "General", docx_bytes("[[V1]]"))
-    client.post("/plantillas/general/upload",
-                files={"archivo": ("v2.docx", docx_bytes("[[V2]]"))}, follow_redirects=False)
+    client.post(f"{API}/plantillas/general/upload", files={"archivo": ("v2.docx", docx_bytes("[[V2]]"))})
 
     h = m.plantillas.get("general").historial()
     assert h
 
-    r = client.post("/plantillas/general/restaurar", data={"nombre": h[0]["nombre"]},
-                    follow_redirects=False)
-    assert "ok=restaurada" in r.headers["location"]
+    r = client.post(f"{API}/plantillas/general/restaurar", json={"nombre": h[0]["nombre"]})
+    assert r.status_code == 200
     assert m.plantillas.get("general").info()["placeholders"] == ["V1"]
 
-    r = client.get("/plantillas/general/download")
+    r = client.get(f"{API}/plantillas/general/download")
     assert r.status_code == 200
     assert len(r.content) > 1000
 
@@ -259,27 +312,38 @@ def test_invitado_no_puede_administrar(client):
     _crear_plantilla(client, "General", docx_bytes("[[X]]"))
     client.cookies.set("rol", "invitado")
 
-    for url, data in (
-        ("/plantillas/general/eliminar", {}),
-        ("/carreras/carrera", {"codigo": "AAA", "nombre": "X"}),
-    ):
-        r = client.post(url, data=data, follow_redirects=False)
-        assert r.status_code == 303
-        assert r.headers["location"] == "/"
+    r = client.post(f"{API}/plantillas/general/eliminar")
+    assert r.status_code == 403
+    r = client.post(f"{API}/carreras/carrera", json={"codigo": "AAA", "nombre": "X"})
+    assert r.status_code == 403
 
-    r = client.get("/plantillas/general/download", follow_redirects=False)
-    assert r.status_code == 303
+    r = client.get(f"{API}/plantillas/general/download")
+    assert r.status_code == 403
 
-    r = client.post("/plantillas/crear", data={"nombre": "Y"},
-                    files={"archivo": ("t.docx", docx_bytes("[[X]]"))}, follow_redirects=False)
-    assert r.headers["location"] == "/"
+    r = client.post(f"{API}/plantillas/crear", data={"nombre": "Y"}, files={"archivo": ("t.docx", docx_bytes("[[X]]"))})
+    assert r.status_code == 403
+
+
+def test_comodines_requieren_sesion_no_admin(client):
+    client.cookies.set("rol", "invitado")
+    r = client.post(f"{API}/comodines", json={"titulo": "Saludo", "texto": "Hola"})
+    assert r.status_code == 200
+    cid = r.json()["id"]
+
+    r = client.get(f"{API}/comodines")
+    assert any(c["id"] == cid for c in r.json())
+
+    r = client.delete(f"{API}/comodines/{cid}")
+    assert r.status_code == 200
+
+    r = client.delete(f"{API}/comodines/no-existe")
+    assert r.status_code == 404
 
 
 # ---------- Alumnos de nuevo ingreso ----------
 
 def _subir_nuevo_ingreso(client, contenido: bytes, nombre="Alumnos de nuevo ingreso 26B.xlsx"):
-    return client.post("/datos/nuevo-ingreso", files={"archivo": (nombre, contenido)},
-                       follow_redirects=False)
+    return client.post(f"{API}/datos/nuevo-ingreso", files={"archivo": (nombre, contenido)})
 
 
 @pytest.mark.skipif(not os.path.exists(EXCEL_NUEVO_INGRESO), reason="requiere el xlsx real (gitignorado)")
@@ -289,7 +353,7 @@ def test_nuevo_ingreso_importa_excel_real(client):
         contenido = f.read()
 
     r = _subir_nuevo_ingreso(client, contenido)
-    assert "ok=1" in r.headers["location"]
+    assert r.status_code == 200
 
     df = m.leer_nuevo_ingreso()
     assert len(df) == 633  # todas las filas del Excel, sin fila de encabezado real
@@ -394,8 +458,8 @@ def test_nuevo_ingreso_eliminar(client):
     aj.update({"ni_filename": "x.xlsx", "ni_fecha_carga": "hoy", "ni_filas": 1, "ni_periodo": "2026B"})
     m.guardar_ajustes(aj)
 
-    r = client.post("/datos/nuevo-ingreso/eliminar", follow_redirects=False)
-    assert "ok=1" in r.headers["location"]
+    r = client.post(f"{API}/datos/nuevo-ingreso/eliminar")
+    assert r.status_code == 200
     assert m.ni_meta() is None
     assert not os.path.exists(m.NUEVO_INGRESO_CSV)
 
@@ -406,4 +470,4 @@ def test_nuevo_ingreso_rechaza_columnas_incorrectas(client):
     buf = io.BytesIO()
     pd.DataFrame([[1, 2, 3], [4, 5, 6]]).to_excel(buf, index=False, header=False)
     r = _subir_nuevo_ingreso(client, buf.getvalue())
-    assert "error=" in r.headers["location"]
+    assert r.status_code == 400

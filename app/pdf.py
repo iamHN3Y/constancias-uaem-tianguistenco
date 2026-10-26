@@ -3,11 +3,24 @@ Conversor docx → pdf usando LibreOffice headless.
 
 Falla con ConversionError si LibreOffice no está disponible o si la conversión
 no produce un PDF de salida. La excepción se propaga al endpoint que llama.
+
+`docx_a_pdf_async` corre la conversión (bloqueante, subprocess) en el
+threadpool de Starlette para no bloquear el event loop de uvicorn, y limita
+a 2 el número de conversiones de LibreOffice corriendo en paralelo (un
+Semaphore a nivel de módulo): dos instancias de soffice compitiendo por CPU
+en una VM pequeña son tolerables; más que eso degrada mucho la latencia sin
+mejorar el throughput real.
 """
+import asyncio
 import os
 import shutil
 import subprocess
 import tempfile
+
+from starlette.concurrency import run_in_threadpool
+
+
+_CONVERSION_SEMAPHORE = asyncio.Semaphore(2)
 
 
 SOFFICE_CANDIDATES = [
@@ -36,7 +49,17 @@ def _resolver_soffice() -> str:
     )
 
 
-def docx_a_pdf(docx_path: str, out_dir: str, timeout: int = 30) -> str:
+async def docx_a_pdf_async(docx_path: str, out_dir: str, timeout: int = 60) -> str:
+    """
+    Igual que `docx_a_pdf` pero sin bloquear el event loop: la conversión
+    (subprocess.run síncrono) corre en el threadpool, y como mucho 2 pueden
+    estar en curso a la vez en todo el proceso uvicorn.
+    """
+    async with _CONVERSION_SEMAPHORE:
+        return await run_in_threadpool(docx_a_pdf, docx_path, out_dir, timeout)
+
+
+def docx_a_pdf(docx_path: str, out_dir: str, timeout: int = 60) -> str:
     """
     Convierte `docx_path` a PDF en `out_dir`. Devuelve la ruta al PDF resultante.
 

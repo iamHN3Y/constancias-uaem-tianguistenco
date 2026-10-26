@@ -8,6 +8,11 @@ Flujo:
   4. Formulario auto-rellenado con los placeholders detectados.
   5. Vista previa en PDF (iframe) que se actualiza con cada cambio.
   6. Descarga final en .docx o .pdf.
+
+El frontend es una SPA de React (ver frontend/) que consume la API JSON en
+/api/v1/* (definida en app/api.py). Este módulo concentra: la lógica de
+dominio (lectura/escritura de datos.csv, ajustes, alumnos), la app FastAPI,
+y el montaje del router de la API + el estático de la SPA compilada.
 """
 from __future__ import annotations
 
@@ -18,23 +23,17 @@ import unicodedata
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime
-from urllib.parse import quote
 
 import pandas as pd
-from fastapi import (
-    BackgroundTasks, FastAPI, File, Form, HTTPException, Request, UploadFile
-)
-from fastapi.responses import (
-    FileResponse, HTMLResponse, JSONResponse, RedirectResponse,
-)
+from fastapi import BackgroundTasks, FastAPI, HTTPException, Request
+from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from fastapi.templating import Jinja2Templates
 
 from . import catalogo, derivar
 from .carreras import Carreras
 from .comodines import Comodines
 from .docx_render import render
-from .pdf import ConversionError, docx_a_pdf
+from .pdf import ConversionError, docx_a_pdf, docx_a_pdf_async
 from .plantilla_universal import RegistroPlantillas
 
 
@@ -79,11 +78,11 @@ async def _lifespan(app: FastAPI):
 
 
 app = FastAPI(title="Generador de Constancias", lifespan=_lifespan)
-templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
-app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
 
 
 # ---------- Auth (pseudo-login con cookie sin firmar) ----------
+# Se exponen como funciones simples; app.api las envuelve en dependencias
+# FastAPI (Depends) que lanzan HTTPException(401/403) en vez de redirigir.
 
 def get_rol(request: Request) -> str | None:
     return request.cookies.get("rol")
@@ -91,19 +90,6 @@ def get_rol(request: Request) -> str | None:
 
 def es_admin(request: Request) -> bool:
     return get_rol(request) == "admin"
-
-
-def _redir_a_login() -> RedirectResponse:
-    return RedirectResponse(url="/login", status_code=303)
-
-
-def _bloquear_si_no_admin(request: Request) -> RedirectResponse | None:
-    rol = get_rol(request)
-    if rol is None:
-        return _redir_a_login()
-    if rol != "admin":
-        return RedirectResponse(url="/", status_code=303)
-    return None
 
 
 # ---------- Ajustes / sesión ----------
@@ -495,353 +481,45 @@ def _generar_y_servir(plantilla, valores: dict, formato: str, basename: str,
     )
 
 
-# ---------- Login ----------
-
-@app.get("/login", response_class=HTMLResponse)
-async def login_page(request: Request):
-    return templates.TemplateResponse(request, "login.html", {})
-
-
-@app.post("/login")
-async def login(rol: str = Form(...), password: str = Form("")):
-    if rol == "admin":
-        if password != ADMIN_PASSWORD:
-            return RedirectResponse(url="/login?error=password", status_code=303)
-        resp = RedirectResponse(url="/", status_code=303)
-        resp.set_cookie("rol", "admin", httponly=True, samesite="lax")
-        return resp
-    if rol == "invitado":
-        resp = RedirectResponse(url="/", status_code=303)
-        resp.set_cookie("rol", "invitado", httponly=True, samesite="lax")
-        return resp
-    raise HTTPException(status_code=400, detail="Rol inválido")
-
-
-@app.post("/logout")
-async def logout():
-    resp = RedirectResponse(url="/login", status_code=303)
-    resp.delete_cookie("rol")
-    return resp
-
-
-# ---------- Rutas: home / búsqueda ----------
-
-@app.get("/", response_class=HTMLResponse)
-async def home(request: Request):
-    if get_rol(request) is None:
-        return _redir_a_login()
-    aj = cargar_ajustes()
-
-    # Resultados de búsqueda por nombre (si venimos de /buscar con texto).
-    q_nombre = request.query_params.get("nombre", "")
-    resultados = buscar_por_nombre(q_nombre) if q_nombre else []
-
-    return templates.TemplateResponse(request, "home.html", {
-        "datos": datos_meta(),
-        "ni": ni_meta(),
-        "plantillas": plantillas.listar(),
-        "ajustes": aj,
-        "es_admin": es_admin(request),
-        "q_nombre": q_nombre,
-        "resultados": resultados,
-    })
-
-
-@app.post("/ajustes")
-async def actualizar_ajustes(request: Request, periodo_actual: str = Form(""),
-                             periodo_inicio: str = Form(""), periodo_fin: str = Form("")):
+async def _generar_y_servir_async(plantilla, valores: dict, formato: str, basename: str,
+                                  bg: BackgroundTasks) -> FileResponse:
     """
-    Guarda el periodo activo y (opcionalmente) sus fechas reales de inicio y
-    fin. Se capturan UNA vez por semestre: todas las constancias salen
-    prellenadas con ellas. Si se dejan vacías, se usan las fechas típicas
-    del periodo (02 feb / 02 ago) como aproximación editable.
+    Igual que `_generar_y_servir`, pero para el caso 'pdf' usa la conversión
+    asíncrona (threadpool + semáforo) para no bloquear el event loop con
+    conversiones de LibreOffice concurrentes. El caso 'docx' no necesita
+    LibreOffice, así que se resuelve igual que la versión síncrona.
     """
-    bloqueo = _bloquear_si_no_admin(request)
-    if bloqueo: return bloqueo
+    if formato != "pdf":
+        return _generar_y_servir(plantilla, valores, formato, basename, bg)
 
-    di, df = _parse_iso(periodo_inicio.strip()), _parse_iso(periodo_fin.strip())
-    if di and df and df < di:
-        return RedirectResponse(
-            url=f"/?error_ajustes={quote('La fecha de fin del periodo no puede ser anterior a la de inicio.')}",
-            status_code=303,
-        )
+    if plantilla is None or not plantilla.exists():
+        raise HTTPException(status_code=404, detail="Plantilla no encontrada")
 
-    aj = cargar_ajustes()
-    aj["periodo_actual"] = periodo_actual.strip().upper()
-    aj["periodo_fecha_inicio"] = di.isoformat() if di else ""
-    aj["periodo_fecha_fin"] = df.isoformat() if df else ""
-    guardar_ajustes(aj)
-    return RedirectResponse(url="/", status_code=303)
+    doc = render(plantilla.path, valores, opcionales_vacios=catalogo.opcionales_de(valores.keys()))
 
+    uid = uuid.uuid4().hex[:8]
+    docx_path = os.path.join(TMP_DIR, f"{basename}_{uid}.docx")
+    doc.save(docx_path)
 
-@app.post("/buscar")
-async def buscar(cuenta: str = Form(...), plantilla: str = Form("")):
-    """Un solo campo: número de cuenta (dígitos) o nombre (texto)."""
-    consulta = cuenta.strip()
-    slug = quote(plantilla or "")
+    try:
+        pdf_path = await docx_a_pdf_async(docx_path, TMP_DIR)
+    except ConversionError as e:
+        _eliminar_silenciosamente(docx_path)
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
-    if re.fullmatch(r"\d{3,}", consulta):
-        if not buscar_alumno(consulta):
-            return RedirectResponse(
-                url=f"/?error=alumno_no_encontrado&cuenta={consulta}", status_code=303,
-            )
-        if not plantillas.alguna_lista():
-            return RedirectResponse(url="/?error=plantilla_no_encontrada", status_code=303)
-        return RedirectResponse(
-            url=f"/generar?cuenta={consulta}&plantilla={slug}", status_code=303,
-        )
-
-    # No parece cuenta: buscar por nombre y mostrar los resultados en home.
-    return RedirectResponse(
-        url=f"/?nombre={quote(consulta)}&plantilla={slug}", status_code=303,
+    bg.add_task(_eliminar_silenciosamente, docx_path, pdf_path)
+    return FileResponse(
+        pdf_path, media_type="application/pdf", filename=f"{basename}.pdf"
     )
 
 
-# ---------- Datos ----------
-
-@app.get("/datos", response_class=HTMLResponse)
-async def datos_page(request: Request):
-    bloqueo = _bloquear_si_no_admin(request)
-    if bloqueo: return bloqueo
-    return templates.TemplateResponse(request, "datos.html", {
-        "datos": datos_meta(),
-        "ni": ni_meta(),
-        "salud": panel_salud(),
-        "ajustes": cargar_ajustes(),
-    })
-
-
-@app.post("/datos/upload")
-async def datos_upload(request: Request, archivo: UploadFile = File(...)):
-    bloqueo = _bloquear_si_no_admin(request)
-    if bloqueo: return bloqueo
-    ext = os.path.splitext(archivo.filename)[1].lower()
-    if ext not in (".xls", ".xlsx", ".csv"):
-        raise HTTPException(status_code=400, detail="Formato no soportado")
-    tmp_path = os.path.join(TMP_DIR, f"upload_{uuid.uuid4().hex[:8]}{ext}")
-    with open(tmp_path, "wb") as f:
-        f.write(await archivo.read())
-    try:
-        guardar_datos(tmp_path, archivo.filename)
-    except ValueError as e:
-        return RedirectResponse(url=f"/datos?error={quote(str(e))}", status_code=303)
-    finally:
-        _eliminar_silenciosamente(tmp_path)
-    return RedirectResponse(url="/datos?ok=1", status_code=303)
-
-
-@app.post("/datos/nuevo-ingreso")
-async def nuevo_ingreso_upload(request: Request, archivo: UploadFile = File(...)):
-    bloqueo = _bloquear_si_no_admin(request)
-    if bloqueo: return bloqueo
-    ext = os.path.splitext(archivo.filename)[1].lower()
-    if ext not in (".xls", ".xlsx"):
-        raise HTTPException(status_code=400, detail="Formato no soportado")
-    tmp_path = os.path.join(TMP_DIR, f"upload_ni_{uuid.uuid4().hex[:8]}{ext}")
-    with open(tmp_path, "wb") as f:
-        f.write(await archivo.read())
-    try:
-        guardar_nuevo_ingreso(tmp_path, archivo.filename)
-    except ValueError as e:
-        return RedirectResponse(url=f"/datos?error={quote(str(e))}", status_code=303)
-    finally:
-        _eliminar_silenciosamente(tmp_path)
-    return RedirectResponse(url="/datos?ok=1", status_code=303)
-
-
-@app.post("/datos/nuevo-ingreso/eliminar")
-async def nuevo_ingreso_eliminar(request: Request):
-    bloqueo = _bloquear_si_no_admin(request)
-    if bloqueo: return bloqueo
-    eliminar_nuevo_ingreso()
-    return RedirectResponse(url="/datos?ok=1", status_code=303)
-
-
-# ---------- Plantilla ----------
-
-@app.get("/plantillas", response_class=HTMLResponse)
-async def plantillas_page(request: Request):
-    bloqueo = _bloquear_si_no_admin(request)
-    if bloqueo: return bloqueo
-    return templates.TemplateResponse(request, "plantillas.html", {
-        "items": plantillas.listar(),
-    })
-
-
-@app.post("/plantillas/crear")
-async def plantillas_crear(request: Request, nombre: str = Form(...),
-                           archivo: UploadFile = File(...)):
-    bloqueo = _bloquear_si_no_admin(request)
-    if bloqueo: return bloqueo
-    if not archivo.filename.lower().endswith(".docx"):
-        return RedirectResponse(
-            url=f"/plantillas?error={quote('Sólo se aceptan archivos .docx.')}", status_code=303,
-        )
-    try:
-        plantillas.crear(nombre, await archivo.read())
-    except ValueError as e:
-        return RedirectResponse(url=f"/plantillas?error={quote(str(e))}", status_code=303)
-    return RedirectResponse(url="/plantillas?ok=creada", status_code=303)
-
+# ---------- Helpers usados por app.api (router JSON /api/v1) ----------
 
 def _plantilla_o_404(slug: str):
     p = plantillas.get(slug)
     if p is None:
         raise HTTPException(status_code=404, detail="Plantilla no encontrada")
     return p
-
-
-@app.post("/plantillas/{slug}/upload")
-async def plantillas_upload(request: Request, slug: str, archivo: UploadFile = File(...)):
-    bloqueo = _bloquear_si_no_admin(request)
-    if bloqueo: return bloqueo
-    p = _plantilla_o_404(slug)
-    if not archivo.filename.lower().endswith(".docx"):
-        return RedirectResponse(
-            url=f"/plantillas?error={quote('Sólo se aceptan archivos .docx.')}", status_code=303,
-        )
-    try:
-        p.replace(await archivo.read())
-    except ValueError as e:
-        return RedirectResponse(url=f"/plantillas?error={quote(str(e))}", status_code=303)
-    return RedirectResponse(url="/plantillas?ok=subida", status_code=303)
-
-
-@app.get("/plantillas/{slug}/download")
-async def plantillas_download(request: Request, slug: str):
-    """Descarga el .docx activo, para editarlo en Word y volverlo a subir."""
-    bloqueo = _bloquear_si_no_admin(request)
-    if bloqueo: return bloqueo
-    p = _plantilla_o_404(slug)
-    if not p.exists():
-        raise HTTPException(status_code=404, detail="No hay archivo cargado")
-    return FileResponse(
-        p.path,
-        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-        filename=f"plantilla_{slug}.docx",
-    )
-
-
-@app.post("/plantillas/{slug}/restaurar")
-async def plantillas_restaurar(request: Request, slug: str, nombre: str = Form(...)):
-    bloqueo = _bloquear_si_no_admin(request)
-    if bloqueo: return bloqueo
-    p = _plantilla_o_404(slug)
-    try:
-        p.restaurar(nombre)
-    except ValueError as e:
-        return RedirectResponse(url=f"/plantillas?error={quote(str(e))}", status_code=303)
-    return RedirectResponse(url="/plantillas?ok=restaurada", status_code=303)
-
-
-@app.post("/plantillas/{slug}/eliminar")
-async def plantillas_eliminar(request: Request, slug: str):
-    bloqueo = _bloquear_si_no_admin(request)
-    if bloqueo: return bloqueo
-    try:
-        plantillas.eliminar(slug)
-    except ValueError as e:
-        return RedirectResponse(url=f"/plantillas?error={quote(str(e))}", status_code=303)
-    return RedirectResponse(url="/plantillas?ok=eliminada", status_code=303)
-
-
-# ---------- Carreras (catálogo editable) ----------
-
-@app.get("/carreras", response_class=HTMLResponse)
-async def carreras_page(request: Request):
-    bloqueo = _bloquear_si_no_admin(request)
-    if bloqueo: return bloqueo
-    return templates.TemplateResponse(request, "carreras.html", {
-        "catalogo": carreras.listar(),
-    })
-
-
-@app.post("/carreras/carrera")
-async def carreras_guardar(request: Request, codigo: str = Form(...), nombre: str = Form(...)):
-    bloqueo = _bloquear_si_no_admin(request)
-    if bloqueo: return bloqueo
-    try:
-        carreras.guardar_carrera(codigo, nombre)
-    except ValueError as e:
-        return RedirectResponse(url=f"/carreras?error={quote(str(e))}", status_code=303)
-    return RedirectResponse(url="/carreras?ok=1", status_code=303)
-
-
-@app.post("/carreras/carrera/eliminar")
-async def carreras_eliminar(request: Request, codigo: str = Form(...)):
-    bloqueo = _bloquear_si_no_admin(request)
-    if bloqueo: return bloqueo
-    carreras.eliminar_carrera(codigo)
-    return RedirectResponse(url="/carreras?ok=1", status_code=303)
-
-
-@app.post("/carreras/duracion")
-async def duracion_guardar(request: Request, plan: str = Form(...), semestres: str = Form(...)):
-    bloqueo = _bloquear_si_no_admin(request)
-    if bloqueo: return bloqueo
-    try:
-        carreras.guardar_duracion(plan, semestres)
-    except ValueError as e:
-        return RedirectResponse(url=f"/carreras?error={quote(str(e))}", status_code=303)
-    return RedirectResponse(url="/carreras?ok=1", status_code=303)
-
-
-@app.post("/carreras/duracion/eliminar")
-async def duracion_eliminar(request: Request, plan: str = Form(...)):
-    bloqueo = _bloquear_si_no_admin(request)
-    if bloqueo: return bloqueo
-    carreras.eliminar_duracion(plan)
-    return RedirectResponse(url="/carreras?ok=1", status_code=303)
-
-
-# ---------- Comodines (snippets reutilizables para LINEA_LIBRE) ----------
-
-@app.get("/comodines")
-async def comodines_list():
-    return JSONResponse(comodines.list())
-
-
-@app.post("/comodines")
-async def comodines_crear(titulo: str = Form(...), texto: str = Form(...)):
-    if not titulo.strip() or not texto.strip():
-        raise HTTPException(status_code=400, detail="Título y texto son requeridos")
-    return JSONResponse(comodines.crear(titulo, texto))
-
-
-@app.delete("/comodines/{cid}")
-async def comodines_eliminar(cid: str):
-    ok = comodines.eliminar(cid)
-    if not ok:
-        raise HTTPException(status_code=404, detail="Comodín no encontrado")
-    return JSONResponse({"ok": True})
-
-
-# ---------- Generación ----------
-
-@app.get("/generar", response_class=HTMLResponse)
-async def generar_page(request: Request, cuenta: str, plantilla: str = ""):
-    alumno = buscar_alumno(cuenta)
-    if not alumno:
-        return RedirectResponse(url="/?error=alumno_no_encontrado", status_code=303)
-
-    p = _plantilla_de(plantilla)
-    info = p.info() if p else None
-    if not info:
-        return RedirectResponse(url="/?error=plantilla_no_encontrada", status_code=303)
-    slug = plantilla if (plantillas.get(plantilla) and plantillas.get(plantilla).exists()) \
-        else plantillas.default_slug()
-
-    aj = cargar_ajustes()
-    campos = catalogo.construir_campos_form(info["placeholders"], alumno, aj, carreras)
-
-    return templates.TemplateResponse(request, "generar.html", {
-        "alumno": alumno,
-        "plantilla": info,
-        "plantilla_slug": slug,
-        "plantilla_nombre": plantillas.nombre_de(slug),
-        "campos": campos,
-        "ajustes": aj,
-    })
 
 
 def _parse_iso(s: str):
@@ -896,22 +574,51 @@ async def _plantilla_y_valores(request: Request):
     return p, form, _form_a_valores(form, info["placeholders"])
 
 
-@app.post("/preview.pdf")
-async def preview_pdf(request: Request, bg: BackgroundTasks):
-    p, _form, valores = await _plantilla_y_valores(request)
-    return _generar_y_servir(p, valores, "pdf", basename="preview", bg=bg)
+# ---------- Router JSON (/api/v1/*) ----------
+# Import diferido: app.api hace `from . import main as m` y accede a las
+# funciones/objetos de este módulo por atributo, así que main.py debe estar
+# completamente definido antes de importarlo.
+from .api import router as api_router  # noqa: E402
+
+app.include_router(api_router)
 
 
-@app.post("/generar/docx")
-async def generar_docx(request: Request, bg: BackgroundTasks):
-    p, form, valores = await _plantilla_y_valores(request)
-    cuenta = form.get("cuenta", "")
-    return _generar_y_servir(p, valores, "docx", basename=f"Constancia_{cuenta}", bg=bg)
+@app.exception_handler(HTTPException)
+async def _http_exception_handler(request: Request, exc: HTTPException):
+    """Toda la API responde errores como {"error": "mensaje"} en vez del
+    {"detail": "..."} por defecto de FastAPI."""
+    return JSONResponse({"error": exc.detail}, status_code=exc.status_code)
 
 
-@app.post("/generar/pdf")
-async def generar_pdf(request: Request, bg: BackgroundTasks):
-    p, form, valores = await _plantilla_y_valores(request)
-    cuenta = form.get("cuenta", "")
-    return _generar_y_servir(p, valores, "pdf", basename=f"Constancia_{cuenta}", bg=bg)
+# ---------- Frontend React (SPA) ----------
+# En producción, `frontend/dist` (generado por `npm run build`) se sirve
+# como estático con fallback a index.html para las rutas del router de
+# React (deep links tipo /generar, /datos, etc. deben servir la SPA, no
+# un 404). En desarrollo (sin build todavía) simplemente no hay nada que
+# montar aquí y el frontend corre aparte con `npm run dev` (Vite, con
+# proxy a este backend).
+FRONTEND_DIST = os.path.join(BASE_DIR, "..", "frontend", "dist")
+FRONTEND_DIST = os.path.abspath(FRONTEND_DIST)
+
+if os.path.isdir(FRONTEND_DIST):
+    app.mount("/assets", StaticFiles(directory=os.path.join(FRONTEND_DIST, "assets")), name="frontend-assets")
+
+    @app.get("/{full_path:path}")
+    async def spa_fallback(full_path: str):
+        """Sirve archivos estáticos del build de Vite si existen; si no,
+        cae en index.html para que React Router resuelva la ruta cliente.
+
+        `full_path` viene del cliente sin normalizar: hay que resolverlo y
+        confirmar que sigue dentro de FRONTEND_DIST antes de servirlo, o un
+        "../../data/datos.csv" serviría archivos arbitrarios del servidor
+        sin pasar por ninguna autenticación.
+        """
+        candidato = os.path.realpath(os.path.join(FRONTEND_DIST, full_path))
+        try:
+            dentro = os.path.commonpath([candidato, FRONTEND_DIST]) == FRONTEND_DIST
+        except ValueError:
+            dentro = False  # rutas en unidades distintas (Windows) → nunca "dentro"
+        if full_path and dentro and os.path.isfile(candidato):
+            return FileResponse(candidato)
+        return FileResponse(os.path.join(FRONTEND_DIST, "index.html"))
 
