@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icono %}
+
+{% block titulo %}{{ art.titulo }}{% endblock %}
+{% block subtitulo %}{{ art.resumen }}{% endblock %}
+{% block ancho %}page--ancha{% endblock %}
+
+{% block migas %}
+<nav class="migas" aria-label="Ruta">
+  <a href="/ayuda">Centro de ayuda</a>
+  <span aria-hidden="true">›</span>
+  {% for clave, nombre, arts in categorias if clave == art.categoria %}<span>{{ nombre }}</span>{% endfor %}
+</nav>
+{% endblock %}
+
+{% block acciones_pagina %}
+  <button type="button" class="btn-ghost" onclick="window.print()">Imprimir guía</button>
+{% endblock %}
+
+{% block contenido %}
+  <div class="guia-layout">
+    <nav class="guia-indice" aria-label="Todas las guías">
+      {% for clave, nombre, arts in categorias %}
+        <p class="guia-indice-cat">{{ nombre }}</p>
+        <ul>
+          {% for a in arts %}
+            <li><a href="/ayuda/{{ a.slug }}" {% if a.slug == art.slug %}aria-current="page"{% endif %}>{{ a.titulo }}</a></li>
+          {% endfor %}
+        </ul>
+      {% endfor %}
+    </nav>
+
+    <article class="guia">
+      {% if art.solo_admin %}
+        <p class="guia-rol">{{ icono("escudo") }}Estas tareas las hace un <strong>administrador</strong>.</p>
+      {% endif %}
+
+      {% include "ayuda/articulos/" ~ art.slug ~ ".html" %}
+
+      {% if art.pantalla %}
+      <div class="guia-ir">
+        <a class="btn" href="{{ art.pantalla[0] }}">{{ icono("adelante") }}{{ art.pantalla[1] }}</a>
+        <a class="btn-tonal btn" href="{{ art.pantalla[0].split('#')[0] }}?ayuda=1">{{ icono("puntero") }}Abrir la pantalla en modo ayuda</a>
+      </div>
+      {% endif %}
+
+      <nav class="guia-vecinos" aria-label="Más guías">
+        {% if anterior %}<a href="/ayuda/{{ anterior.slug }}" class="guia-vecino">{{ icono("atras") }}<span><small>Anterior</small>{{ anterior.titulo }}</span></a>{% else %}<span></span>{% endif %}
+        {% if siguiente %}<a href="/ayuda/{{ siguiente.slug }}" class="guia-vecino guia-vecino--sig"><span><small>Siguiente</small>{{ siguiente.titulo }}</span>{{ icono("adelante") }}</a>{% endif %}
+      </nav>
+    </article>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Un enlace a /ayuda/problemas-frecuentes#semestre-vacio abre esa pregunta.
+  (function () {
+    function abrirDesdeHash() {
+      var id = decodeURIComponent(location.hash.slice(1));
+      var el = id && document.getElementById(id);
+      if (el && el.tagName === "DETAILS") { el.open = true; el.scrollIntoView({ block: "start" }); }
+    }
+    abrirDesdeHash();
+    window.addEventListener("hashchange", abrirDesdeHash);
+  })();
+</script>
+{% endblock %}

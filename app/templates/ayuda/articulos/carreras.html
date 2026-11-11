@@ -1,0 +1,28 @@
+{% from "_macros.html" import icono %}
+<p>El padrón trae el <strong>plan de estudios</strong> de cada alumno como un código (por ejemplo <code>ICO-F19</code>). El catálogo de <a href="/carreras">Carreras</a> traduce ese código al nombre completo que se imprime: «LICENCIATURA DE INGENIERIA EN COMPUTACION».</p>
+
+<h2 id="faltantes">Cuando una carrera no está dada de alta</h2>
+<p>Si el código no está en el catálogo, la constancia muestra el código tal cual (<code>ICO-F19</code>) en lugar del nombre. El sistema revisa el padrón y te avisa en dos lugares: en la lista <strong>Preparación del semestre</strong> de Inicio y al principio de la pantalla Carreras, con cuántos alumnos están afectados.</p>
+
+<h2 id="alta">Dar de alta o corregir una carrera</h2>
+<ol class="pasos">
+  <li>Ve a <a href="/carreras">Carreras</a>. Si aparece en «Faltan carreras», pulsa <strong>Dar de alta</strong> junto al código: el formulario se llena solo.</li>
+  <li>En <strong>Código</strong> va solo el prefijo, lo que está antes del guion: de <code>ICO-F19</code> es <code>ICO</code>. Así sirve para todos los planes de esa carrera (F19, F26…).</li>
+  <li>En <strong>Nombre completo</strong> escribe el nombre exactamente como debe imprimirse (mayúsculas, sin abreviar).</li>
+  <li>Pulsa <strong>Guardar</strong>. Aplica de inmediato.</li>
+</ol>
+<p>Para <strong>corregir</strong> un nombre, pulsa el lápiz de la fila (o guarda de nuevo con el mismo código): se reemplaza el nombre anterior.</p>
+
+<h3>Carreras registradas ahora</h3>
+<table class="tabla">
+  <thead><tr><th scope="col">Código</th><th scope="col">Nombre que se imprime</th></tr></thead>
+  <tbody>
+  {% for codigo, nombre in catalogo.carreras.items() %}
+    <tr><td><code>{{ codigo }}</code></td><td>{{ nombre }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+<h2 id="duracion">Duración de los planes</h2>
+<p>Algunas plantillas imprimen cuántos semestres dura el plan. Por defecto son <strong>{{ catalogo.duracion_default }}</strong>. Si un plan dura distinto, regístralo en «Duración de planes» con el <strong>código completo</strong> (<code>IPI-F26</code>), porque una reestructuración puede cambiar la duración sin cambiar el prefijo: <code>IPI-F26</code> dura 9 aunque <code>IPI-F19</code> dure 10.</p>
+<div class="consejo">{{ icono("info") }}<p>Si eliminas una carrera por error, solo vuelve a darla de alta: no se pierde nada más.</p></div>

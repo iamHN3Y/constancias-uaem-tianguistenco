@@ -1,153 +1,121 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Datos de alumnos</title>
-  <link rel="stylesheet" href="/static/styles.css?v=10">
-</head>
-<body>
-  <div class="page" style="max-width: 820px;">
-    <header class="header">
-      <div class="brand">
-        <h1>Datos de alumnos</h1>
-        <p>El archivo persiste hasta que lo reemplaces.</p>
-      </div>
-      <div class="appbar-actions">
-        <a class="btn-ghost" href="/">
-          <svg viewBox="0 0 24 24"><path d="M15.4 7.4L14 6l-6 6 6 6 1.4-1.4-4.6-4.6 4.6-4.6z"/></svg>
-          Volver
-        </a>
-        <button class="icon-btn" type="button" data-tour title="Ver tutorial" aria-label="Ver tutorial">
-          <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm0 16.5a1.25 1.25 0 110-2.5 1.25 1.25 0 010 2.5zm1.8-6.3c-.7.5-.9.8-.9 1.4v.4h-1.8v-.5c0-1.2.5-1.9 1.4-2.5.7-.5 1-.8 1-1.4 0-.7-.5-1.1-1.3-1.1-.8 0-1.3.4-1.7 1.1l-1.5-.9C9 7.9 10.1 7.2 11.6 7.2c1.9 0 3.2 1 3.2 2.7 0 1.1-.5 1.7-1.6 2.3z"/></svg>
-        </button>
-        <button id="themeToggle" class="icon-btn" type="button"></button>
-      </div>
-    </header>
+{% extends "base.html" %}
+{% from "_macros.html" import icono, ayuda, aviso %}
 
-    {% if request.query_params.get("error") %}
-      <div class="note note-error">
-        <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
-        <span>{{ request.query_params.get("error") }}</span>
-      </div>
-    {% elif request.query_params.get("ok") %}
-      <div class="note">
-        <svg viewBox="0 0 24 24"><path d="M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z"/></svg>
-        <span>Datos cargados correctamente.</span>
+{% block titulo %}Datos de alumnos{% endblock %}
+{% block subtitulo %}El padrón se queda guardado hasta que subas uno nuevo. Actualízalo cuando control escolar entregue la versión del semestre.{% endblock %}
+{% block recorrido %}datos-v2{% endblock %}
+
+{% block acciones_pagina %}
+  <a class="btn-ghost" href="/ayuda/cargar-padron">{{ icono("libro") }}Guía: qué archivo subir</a>
+{% endblock %}
+
+{% block contenido %}
+  {% if request.query_params.get("error") %}
+    {% call aviso("error") %}{{ request.query_params.get("error") }} <a href="/ayuda/cargar-padron#rechazado">Cómo corregirlo</a>{% endcall %}
+  {% elif request.query_params.get("ok") %}
+    {% call aviso("exito") %}Datos guardados. Revisa el resumen de abajo para confirmar que se cargó lo que esperabas.{% endcall %}
+  {% endif %}
+
+  <section class="card entrada-escalonada" style="--i:0" id="tour-estado" aria-labelledby="tituloEstado"
+           {{ ayuda("Resumen del padrón", "Qué archivo está cargado y una revisión rápida de su calidad. Si los números no cuadran con lo que esperabas, vuelve a subir el archivo correcto.", "cargar-padron#revisar", paso=1) }}>
+    <h2 id="tituloEstado">{{ icono("datos") }}Padrón principal</h2>
+    {% if datos %}
+      <dl class="metricas">
+        <div><dt>Alumnos</dt><dd>{{ salud.total }}</dd></div>
+        <div class="{% if salud.sin_sexo %}metrica--alerta{% endif %}"><dt>Sin género</dt><dd>{{ salud.sin_sexo }}</dd></div>
+        <div><dt>Solo nuevo ingreso</dt><dd>{{ salud.nuevo_ingreso }}</dd></div>
+      </dl>
+      <p class="muted">Archivo <strong>{{ datos.filename }}</strong> · cargado {{ datos.fecha_carga | fecha_legible }}</p>
+      {% if salud.sin_sexo %}
+        <p class="hint">{{ salud.sin_sexo }} alumno{{ "s" if salud.sin_sexo != 1 }} sin columna Sexo o vacía: a ellos habrá que marcarles el género a mano al generar.</p>
+      {% endif %}
+    {% else %}
+      <div class="vacio">
+        {{ icono("datos", "vacio-ico") }}
+        <p><strong>Aún no hay padrón.</strong> Sin él no se puede buscar a nadie. Súbelo abajo.</p>
       </div>
     {% endif %}
+    {% if not ajustes.get('periodo_actual', '') %}
+      {% call aviso("alerta") %}No hay periodo activo configurado: el semestre de los alumnos saldrá vacío. <a href="/#periodo">Configúralo en Inicio</a>.{% endcall %}
+    {% endif %}
+  </section>
 
-    <div class="card entrada-escalonada" style="--i:0" id="tour-estado">
-      <h2>
-        <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm-1 5h2v6h-2V7zm0 8h2v2h-2v-2z"/></svg>
-        Estado actual — padrón principal
-      </h2>
-      {% if datos %}
-        <p><strong>{{ datos.filename }}</strong><br>{{ datos.filas }} alumnos · cargado {{ datos.fecha_carga }}</p>
-      {% else %}
-        <p>Aún no se ha cargado ningún archivo.</p>
-      {% endif %}
-    </div>
-
-    <div class="card entrada-escalonada" style="--i:1" id="tour-salud">
-      <h2>
-        <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
-        Panel de salud
-      </h2>
-      <p style="margin: 0 0 6px;">Total en el padrón principal: <strong>{{ salud.total }}</strong></p>
-      <p style="margin: 0 0 6px;">Sin columna Sexo o con Sexo vacío: <strong>{{ salud.sin_sexo }}</strong> (el género no se prellena para esos alumnos)</p>
-      <p style="margin: 0;">Alumnos disponibles solo por «nuevo ingreso»: <strong>{{ salud.nuevo_ingreso }}</strong></p>
-      {% if not ajustes.get('periodo_actual', '') %}
-        <div class="note note-error" style="margin-top: 14px; margin-bottom: 0;">
-          <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
-          <span>No hay periodo activo configurado (en la pantalla principal). Mientras tanto, el semestre de los alumnos de nuevo ingreso saldrá vacío.</span>
-        </div>
-      {% endif %}
-    </div>
-
-    <div class="card entrada-escalonada" style="--i:2">
-      <h2>
-        <svg viewBox="0 0 24 24"><path d="M12 2l5 5h-3v6h-4V7H7l5-5zM5 18h14v2H5v-2z"/></svg>
-        Subir / reemplazar padrón principal
-      </h2>
-      <p>Formatos aceptados: <code>.xls</code>, <code>.xlsx</code>, <code>.csv</code>. El archivo nuevo sustituye al anterior.</p>
-      <form action="/datos/upload" method="post" enctype="multipart/form-data"
-            {% if datos %}
-            data-confirmar data-confirmar-peligro
-            data-confirmar-titulo="¿Reemplazar padrón?"
-            data-confirmar-mensaje="Esto reemplazará «{{ datos.filename }}» y sus {{ datos.filas }} alumnos."
-            data-confirmar-texto="Reemplazar"
-            {% endif %}>
-        <div class="field">
-          <label for="archivo">Archivo de datos</label>
+  <section class="card entrada-escalonada" style="--i:1" aria-labelledby="tituloSubir"
+           {{ ayuda("Subir o reemplazar el padrón", "Acepta .xls, .xlsx o .csv. Debe tener al menos una columna «Cuenta». El archivo nuevo sustituye por completo al anterior; si el archivo trae un problema, se rechaza y los datos actuales no se tocan.", "cargar-padron", paso=2) }}>
+    <h2 id="tituloSubir">{{ icono("subir") }}{{ "Reemplazar padrón" if datos else "Subir padrón" }}</h2>
+    <form action="/datos/upload" method="post" enctype="multipart/form-data"
+          {% if datos %}
+          data-confirmar data-confirmar-peligro
+          data-confirmar-titulo="¿Reemplazar el padrón?"
+          data-confirmar-mensaje="El archivo nuevo sustituye a «{{ datos.filename }}» ({{ datos.filas }} alumnos). Asegúrate de que sea la versión más reciente de control escolar."
+          data-confirmar-texto="Reemplazar"
+          {% endif %}>
+      <div class="field">
+        <span class="label-falsa" id="archivoLbl">Archivo del padrón</span>
+        <label class="dropzone" aria-labelledby="archivoLbl">
           <input id="archivo" type="file" name="archivo" accept=".xls,.xlsx,.csv" required>
-        </div>
-        <div class="actions">
-          <button type="submit">Subir archivo</button>
-        </div>
-      </form>
-    </div>
+          <span class="dropzone-texto">{{ icono("subir") }}<strong>Elige el archivo</strong> o arrástralo aquí · .xls, .xlsx o .csv</span>
+          <span class="dropzone-archivo" aria-live="polite"></span>
+        </label>
+      </div>
+      <details class="detalle-ayuda">
+        <summary>¿Qué columnas debe tener?</summary>
+        <p>Solo <strong>Cuenta</strong> es obligatoria. Las demás se usan para prellenar si existen (no importan mayúsculas, acentos ni espacios en el encabezado):</p>
+        <ul class="lista-columnas">
+          <li><code>Cuenta</code> número de cuenta <span class="field-tag">obligatoria</span></li>
+          <li><code>NombreAlumno</code> «APELLIDOS / NOMBRES»</li>
+          <li><code>Plan</code> plan de estudios, ej. ICO-F19</li>
+          <li><code>PerInicio</code> periodo de ingreso, ej. 2023B</li>
+          <li><code>PrmGR</code> promedio general</li>
+          <li><code>Per</code> promedio del último periodo</li>
+          <li><code>Sit</code> situación (Regular…)</li>
+          <li><code>Sexo</code> M/F, H/M, Masculino/Femenino…</li>
+        </ul>
+      </details>
+      <div class="actions">
+        <button type="submit">{{ icono("subir") }}{{ "Reemplazar padrón" if datos else "Subir padrón" }}</button>
+      </div>
+    </form>
+  </section>
 
-    <div class="card entrada-escalonada" style="--i:3" id="tour-nuevo-ingreso">
-      <h2>
-        <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm5 11h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/></svg>
-        Alumnos de nuevo ingreso
-      </h2>
-      <p>
-        Archivo secundario (Excel de control escolar) para alumnos que aún no aparecen en el padrón
-        principal. Se consulta <strong>solo cuando la cuenta no está en el padrón principal</strong>:
-        si un alumno existe en ambos, siempre gana el padrón principal. No se fusiona con
-        <code>datos.csv</code>; cuando un alumno avanza de semestre y aparece en un padrón principal
-        nuevo, se elimina automáticamente de aquí.
-      </p>
-      {% if ni %}
-        <p>
-          <strong>{{ ni.filename }}</strong><br>
-          {{ ni.filas }} alumnos · cargado {{ ni.fecha_carga }}
-          {% if ni.periodo %} · periodo {{ ni.periodo }}{% endif %}
-        </p>
+  <section class="card entrada-escalonada" style="--i:2" id="tour-nuevo-ingreso" aria-labelledby="tituloNi"
+           {{ ayuda("Alumnos de nuevo ingreso", "Archivo aparte para alumnos que todavía no aparecen en el padrón principal. Solo se consulta si la cuenta no está en el padrón; cuando esos alumnos aparezcan en un padrón nuevo, se quitan de aquí solos.", "nuevo-ingreso", paso=3) }}>
+    <h2 id="tituloNi">{{ icono("persona") }}Alumnos de nuevo ingreso <span class="field-tag">opcional</span></h2>
+    <p>Para alumnos que aún no aparecen en el padrón principal. Si una cuenta está en ambos, siempre gana el padrón principal.</p>
+    {% if ni %}
+      <div class="archivo-actual">
+        <div>
+          <strong>{{ ni.filename }}</strong>
+          <span class="muted">{{ ni.filas }} alumnos{% if ni.periodo %} · periodo {{ ni.periodo }}{% endif %} · cargado {{ ni.fecha_carga | fecha_legible }}</span>
+        </div>
         <form action="/datos/nuevo-ingreso/eliminar" method="post"
               data-confirmar data-confirmar-peligro
-              data-confirmar-titulo="¿Eliminar archivo?"
-              data-confirmar-mensaje="¿Eliminar el archivo de alumnos de nuevo ingreso? Esta acción no se puede deshacer."
-              data-confirmar-texto="Eliminar">
-          <div class="actions">
-            <button type="submit" class="btn-tonal">Eliminar archivo</button>
-          </div>
+              data-confirmar-titulo="¿Quitar el archivo de nuevo ingreso?"
+              data-confirmar-mensaje="Esos alumnos dejarán de aparecer en la búsqueda (salvo los que ya estén en el padrón principal). No se puede deshacer, pero puedes volver a subir el archivo."
+              data-confirmar-texto="Quitar archivo">
+          <button type="submit" class="btn-text btn-text--peligro">{{ icono("basura") }}Quitar</button>
         </form>
-      {% else %}
-        <p>No hay archivo de nuevo ingreso cargado todavía.</p>
-      {% endif %}
-      <form action="/datos/nuevo-ingreso" method="post" enctype="multipart/form-data"
-            {% if ni %}
-            data-confirmar data-confirmar-peligro
-            data-confirmar-titulo="¿Reemplazar archivo de nuevo ingreso?"
-            data-confirmar-mensaje="Esto reemplazará «{{ ni.filename }}» y sus {{ ni.filas }} alumnos."
-            data-confirmar-texto="Reemplazar"
-            {% endif %}>
-        <div class="field">
-          <label for="archivoNi">Excel de alumnos de nuevo ingreso</label>
+      </div>
+    {% endif %}
+    <form action="/datos/nuevo-ingreso" method="post" enctype="multipart/form-data"
+          {% if ni %}
+          data-confirmar data-confirmar-peligro
+          data-confirmar-titulo="¿Reemplazar el archivo de nuevo ingreso?"
+          data-confirmar-mensaje="El archivo nuevo sustituye a «{{ ni.filename }}» ({{ ni.filas }} alumnos)."
+          data-confirmar-texto="Reemplazar"
+          {% endif %}>
+      <div class="field">
+        <span class="label-falsa" id="archivoNiLbl">Excel de nuevo ingreso</span>
+        <label class="dropzone" aria-labelledby="archivoNiLbl">
           <input id="archivoNi" type="file" name="archivo" accept=".xls,.xlsx" required>
-        </div>
-        <div class="actions">
-          <button type="submit">Subir archivo</button>
-        </div>
-      </form>
-    </div>
-  </div>
-  <script src="/static/theme.js?v=10"></script>
-  <script src="/static/ui.js?v=10"></script>
-  <script>
-    window.TOUR = {
-      key: "datos",
-      steps: [
-        { sel: "#tour-estado", title: "Estado actual", text: "Aquí ves qué archivo de alumnos está cargado y cuántos registros tiene." },
-        { sel: "#tour-salud", title: "Panel de salud", text: "Resumen rápido del padrón: cuántos alumnos hay, a cuántos les falta la columna Sexo, y cuántos solo existen en «nuevo ingreso»." },
-        { sel: "#archivo", title: "Subir o reemplazar", text: "Elige un archivo .xls, .xlsx o .csv y pulsa Subir. El nuevo reemplaza por completo al anterior." },
-        { sel: "#tour-nuevo-ingreso", title: "Alumnos de nuevo ingreso", text: "Archivo aparte para alumnos que todavía no están en el padrón principal. Si una cuenta existe en ambos, siempre gana el padrón principal." }
-      ]
-    };
-  </script>
-  <script src="/static/tour.js?v=10"></script>
-</body>
-</html>
+          <span class="dropzone-texto">{{ icono("subir") }}<strong>Elige el Excel</strong> o arrástralo aquí · .xls o .xlsx</span>
+          <span class="dropzone-archivo" aria-live="polite"></span>
+        </label>
+        <p class="hint">Sin encabezados, exactamente 6 columnas en este orden: Cuenta, Apellido paterno, Apellido materno, Nombre(s), Plan, Periodo. <a href="/ayuda/nuevo-ingreso">Ver ejemplo</a></p>
+      </div>
+      <div class="actions">
+        <button type="submit" class="btn-tonal">{{ icono("subir") }}{{ "Reemplazar archivo" if ni else "Subir archivo" }}</button>
+      </div>
+    </form>
+  </section>
+{% endblock %}

@@ -2,6 +2,8 @@
 
 Guía para el personal del Centro Universitario UAEM Tianguistenco que usa esta herramienta para generar constancias escolares. Para detalles técnicos del sistema, ver [TECNICA.md](TECNICA.md).
 
+> **La ayuda completa y actualizada está dentro del sistema:** pulsa **Modo ayuda** (o la tecla `?`) y haz clic en cualquier parte de la pantalla, o abre **Guías** en la barra superior (`/ayuda`). Este archivo es un resumen para leer fuera del sistema.
+
 ## ¿Qué hace esta herramienta?
 
 Genera constancias escolares (en Word `.docx` o PDF) llenando automáticamente el nombre, cuenta, carrera, semestre y otros datos del alumno, a partir de una plantilla ya diseñada por la escuela. Ya no hay que copiar y pegar datos a mano documento por documento.
@@ -37,6 +39,8 @@ flowchart TD
 
 ## Primeros pasos (solo administrador, una vez por semestre)
 
+La tarjeta **Preparación del semestre** de la pantalla principal revisa sola estos pasos y marca lo que falta (incluidas carreras del padrón que no estén dadas de alta).
+
 1. **Configurar el periodo activo.** En la pantalla principal, en la tarjeta "Periodo activo", escribe el periodo en curso (ej. `2026A`) y, si las conoces, las fechas reales de inicio y fin del semestre. Esto es lo que permite que el sistema calcule solo el semestre de cada alumno y prellene las fechas en cada constancia. Si no lo configuras, esos campos saldrán vacíos y tendrás que llenarlos a mano en cada documento.
 
 2. **Cargar el padrón de alumnos.** Ve a "Gestionar datos" → sube el archivo `.xls`, `.xlsx` o `.csv` con los alumnos (el que entrega control escolar). El archivo se queda guardado hasta que subas otro — no hay que volver a subirlo cada vez que alguien pida una constancia.
@@ -49,14 +53,14 @@ flowchart TD
 
 ## Generar una constancia (admin o invitado)
 
-1. En la pantalla principal, escribe el **número de cuenta** o **parte del nombre** del alumno en el buscador y presiona Enter (o el atajo de teclado `/` para saltar directo al buscador desde cualquier parte de la página).
+1. En la pantalla principal, escribe el **número de cuenta** o **parte del nombre** del alumno en el buscador Mientras escribes aparecen sugerencias: elige al alumno con un clic o con las flechas y Enter (el atajo `/` salta directo al buscador).
 2. Si hay más de una plantilla disponible, elige el tipo de constancia.
 3. Se abre el formulario con casi todo ya llenado: nombre, carrera, semestre, fechas del periodo. A la derecha se ve una **vista previa en vivo** del documento — cada cambio que hagas se refleja ahí en un par de segundos.
 4. Revisa/completa lo que falte:
    - El **género** puede no venir marcado si el padrón no trae esa columna — selecciónalo a mano.
    - Las **líneas opcionales** (promedio, periodo vacacional, línea libre) tienen un interruptor: si lo apagas o las dejas vacías, esa línea desaparece por completo del documento final, en vez de imprimirse en blanco.
    - La barra de "comodines" sobre la línea libre te permite insertar un texto guardado de antes, o guardar el que acabas de escribir para reutilizarlo después.
-5. Cuando esté todo correcto, descarga en **.docx** (para seguir editando en Word) o **.pdf** (listo para imprimir/enviar).
+5. Cuando esté todo correcto, descarga en **PDF** (listo para imprimir o enviar) o **Word** (para seguir editando). La barra de descarga avisa si quedó algún campo importante vacío. Al terminar, el sistema ofrece buscar otro alumno, y las últimas constancias quedan en «Recientes en este equipo» para volver a generarlas con un clic.
 
 ## Buscar por nombre cuando no tienes la cuenta a la mano
 

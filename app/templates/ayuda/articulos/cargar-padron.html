@@ -1,0 +1,44 @@
+{% from "_macros.html" import icono %}
+<p>El padrón es la lista de alumnos que entrega control escolar. El sistema lo guarda y lo usa para buscar alumnos y prellenar las constancias hasta que subas uno nuevo.</p>
+
+<h2 id="subir">Cómo subirlo</h2>
+<ol class="pasos">
+  <li>Ve a <a href="/datos">Datos</a>.</li>
+  <li>En <strong>Subir padrón</strong>, elige el archivo (o arrástralo al recuadro). Se aceptan <code>.xls</code>, <code>.xlsx</code> y <code>.csv</code>.</li>
+  <li>Pulsa <strong>Subir padrón</strong>. Si ya había uno, el sistema pide confirmación y te dice cuál se va a reemplazar.</li>
+  <li>Revisa el resumen: el número de alumnos debe coincidir con lo que esperabas.</li>
+</ol>
+
+<h2 id="columnas">Columnas que debe tener</h2>
+<p>Solo <strong>Cuenta</strong> es obligatoria. Las demás, si están, se usan para prellenar. No importa el orden ni si los encabezados vienen en mayúsculas, con acentos o espacios («CUENTA» o «per inicio» funcionan).</p>
+<table class="tabla">
+  <thead><tr><th scope="col">Columna</th><th scope="col">Qué contiene</th><th scope="col">Se usa para</th></tr></thead>
+  <tbody>
+    <tr><td><code>Cuenta</code> <span class="field-tag">obligatoria</span></td><td>Número de cuenta</td><td>Buscar al alumno</td></tr>
+    <tr><td><code>NombreAlumno</code></td><td>«APELLIDOS / NOMBRES»</td><td>Nombre completo y búsqueda por nombre</td></tr>
+    <tr><td><code>Plan</code></td><td>Plan de estudios, ej. ICO-F19</td><td>Nombre de la carrera y duración</td></tr>
+    <tr><td><code>PerInicio</code></td><td>Periodo de ingreso, ej. 2023B</td><td>Calcular el semestre</td></tr>
+    <tr><td><code>PrmGR</code></td><td>Promedio general</td><td>Línea de promedio general</td></tr>
+    <tr><td><code>Per</code></td><td>Promedio del último periodo</td><td>Línea de promedio del último periodo</td></tr>
+    <tr><td><code>Sit</code></td><td>Situación (Regular…)</td><td>Referencia al generar</td></tr>
+    <tr><td><code>Sexo</code></td><td>M/F, H/M, Masculino/Femenino, Hombre/Mujer</td><td>Marcar el género automáticamente</td></tr>
+  </tbody>
+</table>
+
+<h2 id="revisar">Revisar que se cargó bien</h2>
+<p>Después de subirlo, el resumen de <a href="/datos">Datos</a> muestra:</p>
+<ul>
+  <li><strong>Alumnos:</strong> cuántos se cargaron.</li>
+  <li><strong>Sin género:</strong> alumnos sin columna Sexo o con ella vacía. A ellos hay que marcarles el género a mano al generar.</li>
+  <li><strong>Solo nuevo ingreso:</strong> alumnos que existen únicamente en el archivo de nuevo ingreso.</li>
+</ul>
+<p>Si el padrón trae planes sin carrera dada de alta, Inicio y Carreras te lo avisan.</p>
+
+<h2 id="rechazado">Si el sistema rechaza el archivo</h2>
+<p>Cuando un archivo tiene un problema, se rechaza con un mensaje y <strong>los datos que ya estaban no se tocan</strong>. Causas comunes:</p>
+<ul>
+  <li><strong>«No tiene una columna Cuenta»:</strong> el encabezado se llama distinto (por ejemplo «No. de cuenta» o «Matrícula»). Cámbialo a «Cuenta» en Excel y vuelve a subirlo. El mensaje dice qué columnas encontró.</li>
+  <li><strong>«No se pudo leer el archivo»:</strong> el archivo está dañado o protegido con contraseña. Ábrelo en Excel, usa «Guardar como» .xlsx y súbelo de nuevo.</li>
+  <li><strong>«No tiene filas de alumnos»:</strong> el archivo solo tiene encabezados, o los datos están en otra hoja. Deja los alumnos en la primera hoja.</li>
+</ul>
+<div class="consejo">{{ icono("info") }}<p>Las cuentas que Excel convierte en número (2014694.0) se corrigen solas.</p></div>

@@ -407,3 +407,102 @@ def test_nuevo_ingreso_rechaza_columnas_incorrectas(client):
     pd.DataFrame([[1, 2, 3], [4, 5, 6]]).to_excel(buf, index=False, header=False)
     r = _subir_nuevo_ingreso(client, buf.getvalue())
     assert "error=" in r.headers["location"]
+
+
+# ---------- Rediseño: búsqueda en vivo, preparación del semestre, ayuda ----------
+
+def test_api_alumnos_sugerencias(client):
+    _crear_plantilla(client, "General", docx_bytes("[[NOMBRE_COMPLETO]]"))
+    _subir_datos(client)
+
+    # Por inicio de cuenta.
+    r = client.get("/api/alumnos", params={"q": "2015"})
+    assert r.status_code == 200
+    assert [a["cuenta"] for a in r.json()] == ["2015000"]
+    assert r.json()[0]["nombre"] == "GARCÍA ANA MARÍA"
+
+    # Por nombre, sin acentos.
+    r = client.get("/api/alumnos", params={"q": "garcia ana"})
+    assert [a["cuenta"] for a in r.json()] == ["2015000"]
+
+    # Consultas muy cortas no buscan nada.
+    assert client.get("/api/alumnos", params={"q": "2"}).json() == []
+
+    # Sin sesión no hay datos de alumnos.
+    client.cookies.clear()
+    assert client.get("/api/alumnos", params={"q": "2015"}).status_code == 401
+
+
+def test_preparacion_detecta_carreras_faltantes(client):
+    m = client.modulo
+    _crear_plantilla(client, "General", docx_bytes("[[CARRERA_FULL]]"))
+    _subir_datos(client)  # trae un plan XYZ-F30 que no está en el catálogo
+
+    faltan = m.planes_sin_carrera()
+    assert {"codigo": "XYZ", "alumnos": 1} in faltan
+
+    prep = m.preparacion_semestre(m.cargar_ajustes(), m.plantillas.listar())
+    pasos = {p["clave"]: p for p in prep["pasos"]}
+    assert not pasos["periodo"]["ok"]          # sin periodo configurado
+    assert pasos["padron"]["ok"]
+    assert pasos["plantillas"]["ok"]
+    assert not pasos["carreras"]["ok"]
+    assert "XYZ" in pasos["carreras"]["detalle"]
+    assert not prep["listo"]
+
+    r = client.get("/")
+    assert "Preparación del semestre" in r.text
+    r = client.get("/carreras")
+    assert "Dar de alta" in r.text and "XYZ" in r.text
+
+
+def test_centro_de_ayuda_renderiza_todas_las_guias(client):
+    from app import ayuda
+
+    r = client.get("/ayuda")
+    assert r.status_code == 200
+    for a in ayuda.ARTICULOS:
+        assert f'/ayuda/{a["slug"]}' in r.text
+        ra = client.get(f'/ayuda/{a["slug"]}')
+        assert ra.status_code == 200, a["slug"]
+        assert a["titulo"] in ra.text
+
+    # La referencia de campos se genera desde el catálogo real.
+    r = client.get("/ayuda/campos-de-plantilla")
+    for nombre in ("NOMBRE_COMPLETO", "FECHA_EXPEDICION", "PERIODO_VACACIONAL_LINEA"):
+        assert f"[[{nombre}]]" in r.text
+
+    # Slug desconocido vuelve al índice.
+    r = client.get("/ayuda/no-existe", follow_redirects=False)
+    assert r.headers["location"] == "/ayuda"
+
+
+def test_ayuda_disponible_sin_sesion_y_plantilla_ejemplo(client):
+    client.cookies.clear()
+    assert client.get("/ayuda").status_code == 200
+    assert client.get("/ayuda/bienvenida").status_code == 200
+    r = client.get("/ayuda/plantilla-ejemplo.docx")
+    assert r.status_code == 200
+    Document(io.BytesIO(r.content))  # es un .docx válido
+
+
+def test_cada_campo_tiene_ayuda_para_el_modo_ayuda(client):
+    from app import ayuda, catalogo
+
+    for nombre in catalogo.ETIQUETAS:
+        if catalogo.tipo_de(nombre) != catalogo.HIDDEN_DERIVADO:
+            assert nombre in ayuda.AYUDA_CAMPOS, f"falta ayuda para {nombre}"
+    # Los campos inventados en Word también reciben una explicación.
+    assert "opcional" in ayuda.ayuda_campo("BECA_LINEA")
+    assert "calendario" in ayuda.ayuda_campo("EXAMEN_FECHA")
+
+
+def test_pantallas_admin_tienen_modo_ayuda_y_recorrido(client):
+    _crear_plantilla(client, "General", docx_bytes("[[NOMBRE_COMPLETO]] [[ARTICULO]] [[BECA_LINEA]]"))
+    _subir_datos(client)
+    for url in ("/", "/datos", "/plantillas", "/carreras", "/generar?cuenta=2014694"):
+        r = client.get(url)
+        assert r.status_code == 200, url
+        assert 'id="btnModoAyuda"' in r.text, url
+        assert "data-ayuda=" in r.text, url
+        assert "data-recorrido=" in r.text, url

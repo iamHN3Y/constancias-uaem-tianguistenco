@@ -1,0 +1,67 @@
+{% from "_macros.html" import icono %}
+<p>Busca tu problema en la lista. Cada uno dice qué lo causa y cómo resolverlo.</p>
+
+<details class="faq" id="no-encuentra" open>
+  <summary>No encuentro a un alumno</summary>
+  <ul>
+    <li><strong>Por cuenta:</strong> revisa el número. Las sugerencias aparecen con las cuentas que <em>empiezan</em> con lo que escribes.</li>
+    <li><strong>Por nombre:</strong> prueba solo con un apellido. No importan acentos ni mayúsculas, pero sí la ortografía.</li>
+    <li>Si sigue sin aparecer, el alumno no está en el padrón cargado. Puede ser de nuevo ingreso o haberse inscrito después de que se subió el padrón. El administrador puede <a href="/ayuda/cargar-padron">subir el padrón actualizado</a> o <a href="/ayuda/nuevo-ingreso">agregarlo como nuevo ingreso</a>.</li>
+  </ul>
+</details>
+
+<details class="faq" id="semestre-vacio">
+  <summary>El semestre o las fechas del periodo salen vacíos</summary>
+  <ul>
+    <li>Falta configurar el <strong>periodo activo</strong>. El administrador lo hace en Inicio, una vez por semestre (<a href="/ayuda/inicio-de-semestre#periodo">ver cómo</a>). Mientras tanto puedes escribirlos a mano en el formulario.</li>
+    <li>Si el alumno es de <strong>nuevo ingreso</strong>, el semestre sale vacío a propósito: escríbelo tú.</li>
+    <li>Si el alumno no tiene periodo de ingreso en el padrón (columna PerInicio), tampoco se puede calcular.</li>
+  </ul>
+</details>
+
+<details class="faq" id="semestre-mal">
+  <summary>El semestre sale equivocado</summary>
+  <p>Casi siempre es porque el <strong>periodo activo</strong> no se actualizó este semestre. Pídele al administrador que lo revise en Inicio. Si solo pasa con un alumno, revisa su periodo de ingreso en el resumen de arriba del formulario: si está mal en el padrón, corrige el semestre a mano y avisa a control escolar.</p>
+</details>
+
+<details class="faq" id="carrera-codigo">
+  <summary>En lugar del nombre de la carrera sale un código (ICO-F19)</summary>
+  <p>Esa carrera no está dada de alta en el catálogo. Escribe el nombre a mano por ahora y pídele al administrador que la dé de alta en Carreras; a partir de ese momento saldrá bien para todos. <a href="/ayuda/carreras">Ver cómo</a>.</p>
+</details>
+
+<details class="faq" id="genero">
+  <summary>No me deja descargar: «Elige el género»</summary>
+  <p>El padrón no trae el género de este alumno. Márcalo en el formulario (Masculino o Femenino): cambia «el alumno / la alumna» en el texto, por eso es obligatorio.</p>
+</details>
+
+<details class="faq" id="vista-previa">
+  <summary>La vista previa no carga o tarda mucho</summary>
+  <ul>
+    <li>La primera vista previa del día puede tardar unos segundos más: el sistema está arrancando el convertidor de documentos.</li>
+    <li>Si dice «no se pudo generar», revisa si la plantilla tiene avisos en Plantillas. Puedes descargar en Word mientras tanto.</li>
+    <li>Si dice «sin conexión», el servidor no responde: revisa la red o avisa a quien administra el equipo donde corre el sistema.</li>
+    <li>Algunos navegadores no muestran PDF dentro de la página. Usa Chrome, Edge o Firefox actualizados.</li>
+  </ul>
+</details>
+
+<details class="faq" id="linea-vacia">
+  <summary>Aparece una línea que no quería (o falta una que sí)</summary>
+  <p>Revisa los interruptores de <strong>Líneas opcionales</strong>: encendida se imprime, apagada desaparece. <a href="/ayuda/lineas-opcionales-y-frases">Más detalles</a>.</p>
+</details>
+
+<details class="faq" id="corchetes">
+  <summary>En el documento sale texto entre corchetes, como [[ALGO]]</summary>
+  <p>La plantilla tiene un campo con un nombre que el sistema no reconoce, o mal escrito. El administrador debe revisarla en Plantillas (los avisos indican qué corregir). <a href="/ayuda/crear-plantilla#errores">Errores comunes en plantillas</a>.</p>
+</details>
+
+<details class="faq" id="plantilla-rechazada">
+  <summary>El sistema rechaza mi plantilla o mi padrón</summary>
+  <p>Cuando un archivo tiene un problema se rechaza y lo que ya estaba cargado <strong>no se modifica</strong>. Para plantillas: debe ser .docx (no .doc ni PDF). Para el padrón: debe tener una columna «Cuenta». <a href="/ayuda/cargar-padron#rechazado">Ver todas las causas</a>.</p>
+</details>
+
+<details class="faq" id="contrasena">
+  <summary>No sé la contraseña de administrador</summary>
+  <p>Solo la conoce quien administra el sistema. Para generar constancias no la necesitas: entra como <strong>Invitado</strong>.</p>
+</details>
+
+<div class="consejo">{{ icono("puntero") }}<p>¿Tu problema no está aquí? Activa el <strong>Modo ayuda</strong> en la pantalla donde estás y haz clic en la zona con dudas: cada parte explica de dónde salen sus datos.</p></div>

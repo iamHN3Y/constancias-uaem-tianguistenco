@@ -1,0 +1,113 @@
+{#- ============================================================
+    Esqueleto común de todas las pantallas.
+
+    Bloques que define cada página:
+      titulo           <title> y encabezado de la pantalla
+      subtitulo        línea bajo el título (opcional)
+      acciones_pagina  botones a la derecha del encabezado (opcional)
+      contenido        cuerpo de la pantalla
+      head / scripts   CSS y JS propios de la página
+      recorrido        clave del recorrido guiado ("" = sin recorrido).
+                       Los pasos salen de los elementos con data-recorrido
+                       (macro ayuda(..., paso=N)), no se escriben aparte.
+      ancho            clase de ancho: "" | "page--angosta" | "page--ancha"
+
+    La barra superior es igual en todas las pantallas: navegación, centro
+    de ayuda y modo ayuda siempre en el mismo lugar (WCAG 2.2 «ayuda
+    consistente»), para que nadie tenga que buscarlos.
+    ============================================================ -#}
+{% from "_macros.html" import icono, ayuda %}
+{% set rol = request.cookies.get("rol") %}
+{% set ruta = request.url.path %}
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block titulo %}Generador de Constancias{% endblock %} · Constancias UAEM Tianguistenco</title>
+  <link rel="stylesheet" href="/static/styles.css?v={{ V }}">
+  <script>
+    // Aplica el tema guardado antes de pintar, para no parpadear en claro.
+    try { var t = localStorage.getItem("theme"); if (t) document.documentElement.setAttribute("data-theme", t); } catch (e) {}
+  </script>
+  {% block head %}{% endblock %}
+</head>
+<body>
+  <a class="skip-link" href="#contenido">Saltar al contenido</a>
+
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="marca" href="{{ '/' if rol else '/login' }}" aria-label="Generador de Constancias — inicio">
+        <span class="marca-logo" aria-hidden="true">C</span>
+        <span class="marca-texto">
+          <strong>Constancias</strong>
+          <small>UAEM Tianguistenco</small>
+        </span>
+      </a>
+
+      {% if rol %}
+      <nav class="nav-principal" aria-label="Secciones"
+           {{ ayuda("Menú de secciones", "Desde aquí te mueves entre las pantallas. Invitado solo ve Inicio; el administrador ve además Datos, Plantillas y Carreras.") }}>
+        <a href="/" {% if ruta == "/" or ruta.startswith("/generar") %}aria-current="page"{% endif %}>{{ icono("inicio") }}<span>Inicio</span></a>
+        {% if rol == "admin" %}
+        <a href="/datos" {% if ruta.startswith("/datos") %}aria-current="page"{% endif %}>{{ icono("datos") }}<span>Datos</span></a>
+        <a href="/plantillas" {% if ruta.startswith("/plantillas") %}aria-current="page"{% endif %}>{{ icono("plantilla") }}<span>Plantillas</span></a>
+        <a href="/carreras" {% if ruta.startswith("/carreras") %}aria-current="page"{% endif %}>{{ icono("carreras") }}<span>Carreras</span></a>
+        {% endif %}
+      </nav>
+      {% endif %}
+
+      <div class="topbar-acciones">
+        <button id="btnModoAyuda" class="topbar-btn topbar-btn--ayuda" type="button" aria-pressed="false"
+                title="Modo ayuda (tecla ?)" data-ayuda-exento>
+          {{ icono("puntero") }}<span class="topbar-btn-texto">Modo ayuda</span>
+        </button>
+        <a class="topbar-btn" href="/ayuda" title="Centro de ayuda: guías paso a paso" {% if ruta.startswith("/ayuda") %}aria-current="page"{% endif %}
+           {{ ayuda("Centro de ayuda", "Guías paso a paso para todo: generar constancias, crear plantillas, preparar el semestre y resolver problemas. Tiene buscador.", "como-pedir-ayuda") }}>
+          {{ icono("libro") }}<span class="topbar-btn-texto">Guías</span>
+        </a>
+        <button id="themeToggle" class="icon-btn" type="button" data-ayuda-exento></button>
+        {% if rol %}
+        <div class="sesion" {{ ayuda("Tu sesión", "Muestra con qué rol entraste. Administrador puede cargar datos, plantillas y carreras; Invitado solo genera constancias. Usa «Salir» al terminar, sobre todo en equipos compartidos.") }}>
+          <span class="chip {% if rol == 'admin' %}chip-primary{% endif %}">
+            {{ icono("escudo" if rol == "admin" else "persona") }}{{ "Administrador" if rol == "admin" else "Invitado" }}
+          </span>
+          <form action="/logout" method="post">
+            <button type="submit" class="btn-text btn-salir" title="Cerrar sesión">{{ icono("salir") }}<span class="topbar-btn-texto">Salir</span></button>
+          </form>
+        </div>
+        {% endif %}
+      </div>
+    </div>
+  </header>
+
+  <main id="contenido" class="page {% block ancho %}{% endblock %}" tabindex="-1">
+    {% block encabezado %}
+    <div class="page-head">
+      <div>
+        {% block migas %}{% endblock %}
+        <h1>{{ self.titulo() }}</h1>
+        {% if self.subtitulo() | trim %}<p class="page-sub">{% block subtitulo %}{% endblock %}</p>{% endif %}
+      </div>
+      <div class="page-head-acciones">{% block acciones_pagina %}{% endblock %}</div>
+    </div>
+    {% endblock %}
+
+    {% block contenido %}{% endblock %}
+  </main>
+
+  <footer class="pie">
+    <span>¿Olvidaste cómo hacer algo? Pulsa <kbd>?</kbd> o el botón <strong>Modo ayuda</strong> y haz clic en cualquier zona de la pantalla.</span>
+    <a href="/ayuda">Ver todas las guías</a>
+  </footer>
+
+  <script src="/static/theme.js?v={{ V }}"></script>
+  <script src="/static/ui.js?v={{ V }}"></script>
+  {% if self.recorrido() | trim %}
+  <script>window.TOUR = { key: "{% block recorrido %}{% endblock %}" };</script>
+  {% endif %}
+  <script src="/static/tour.js?v={{ V }}"></script>
+  <script src="/static/ayuda.js?v={{ V }}"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

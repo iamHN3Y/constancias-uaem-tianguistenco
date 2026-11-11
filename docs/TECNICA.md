@@ -84,11 +84,36 @@ graph TB
 
 ### Frontend (`app/templates/`, `app/static/`)
 
-6 vistas Jinja2 (login, home, generar, datos, plantillas, carreras) + CSS Material Design 3 propio (`styles.css`, tokens de color/elevación/motion, modo oscuro por `data-theme`) + JS vanilla:
+Todas las vistas heredan de **`base.html`** (barra superior común con navegación, *Modo ayuda*, *Guías*, tema y sesión; encabezado de página; pie). Cada vista solo llena bloques: `titulo`, `subtitulo`, `acciones_pagina`, `contenido`, `scripts`, `recorrido`, `ancho`. **`_macros.html`** tiene los íconos SVG (`icono("nombre")`), los avisos (`{% call aviso("exito") %}…{% endcall %}`) y la macro `ayuda(...)` del sistema de ayuda (ver «Sistema de ayuda integrado», abajo).
 
-- `theme.js` — toggle de tema claro/oscuro.
-- `tour.js` — tour guiado paso a paso por vista (`window.TOUR`).
-- `ui.js` — infraestructura de UI compartida: `avisar()` (snackbars con `aria-live`), `confirmar()` (diálogos de confirmación con `<dialog>` nativo, soporta "escribir para confirmar"), `pedirTexto()`, `protegerFormulario()` (intercepta `submit`, valida, confirma, reenvía con `requestSubmit()`).
+Vistas: login, home, generar, datos, plantillas, carreras y el centro de ayuda (`ayuda/index.html`, `ayuda/articulo.html`, `ayuda/articulos/<slug>.html`). CSS Material Design 3 propio en un solo `styles.css` (tokens de color/elevación/movimiento, modo oscuro por `data-theme`). JS vanilla, sin dependencias ni CDNs:
+
+- `theme.js`: tema claro/oscuro y ripple.
+- `ui.js`: snackbars `avisar()`, diálogos `confirmar()` / `pedirTexto()`, `protegerFormulario()` + formularios `data-confirmar` declarativos, zonas para soltar archivos (`<label class="dropzone">`) y `window.recientes` (constancias recientes en `localStorage`, solo en ese navegador).
+- `ayuda.js`: **modo ayuda**.
+- `tour.js`: **recorrido guiado**, generado desde los mismos textos de ayuda.
+- `buscador.js`: Inicio. Sugerencias en vivo (combobox ARIA contra `/api/alumnos`), atajo `/`, lista de recientes.
+- `generar.js`: vista previa en vivo, interruptores de líneas opcionales, revisión de campos vacíos antes de descargar, diálogo «¿Qué sigue?», frases guardadas.
+
+**Caché de estáticos:** las vistas piden `styles.css?v={{ V }}`. Al cambiar CSS/JS, sube `templates.env.globals["V"]` en `main.py` para que los navegadores no usen la copia vieja.
+
+### Sistema de ayuda integrado
+
+Pensado para que el texto de ayuda **viva en un solo lugar** y no se contradiga con el tiempo:
+
+| Pieza | Dónde | Qué hace |
+|---|---|---|
+| Macro `ayuda(titulo, texto, articulo="", paso=0)` | `_macros.html`, usada en cada vista | Pone `data-ayuda*` en un elemento. El **modo ayuda** lo marca y al hacer clic muestra la explicación; con `paso=N` forma parte del **recorrido guiado** de esa pantalla, en ese orden; `articulo` (slug o `slug#ancla`) añade «Leer la guía completa». |
+| `ayuda.js` | `static/` | Modo ayuda: botón de la barra o tecla `?`. Marca cada `[data-ayuda]` visible con un «?», intercepta los clics en esas zonas (no ejecutan nada mientras el modo está activo) y abre una tarjeta navegable (‹ ›, flechas, `Esc`). `?ayuda=1` en la URL abre la pantalla ya en modo ayuda. |
+| `tour.js` | `static/` | Recorrido guiado: toma los elementos con `data-recorrido`, en orden, y agrega un último paso que señala el botón *Modo ayuda*. Se lanza solo la primera vez por pantalla y navegador (clave del bloque `recorrido`; **cambia la clave**, p. ej. `-v3`, si quieres que todos lo vuelvan a ver tras un rediseño), con `window.iniciarRecorrido()` o con `?recorrido=1`. |
+| `app/ayuda.py` | backend | `ARTICULOS` (índice de guías: slug, categoría, título, resumen, palabras clave, si es de administrador, botón «Ir a la pantalla»), `AYUDA_CAMPOS` (explicación de cada campo del formulario, usada por el modo ayuda en `/generar` y por la guía de referencia) y `referencia_campos()` (tabla de campos con ejemplos calculados con `derivar`, así nunca se desactualiza). |
+| Guías | `templates/ayuda/articulos/<slug>.html` | Cuerpo de cada guía (Jinja; reciben `campos`, `catalogo`, `columnas_padron`). Componentes: `ol.pasos`, `div.consejo` / `.consejo--atencion`, `table.tabla`, `details.faq` (se abre solo si la URL trae su `#id`), `div.word-mock` + `span.ph-demo`. |
+
+**Para agregar una guía:** una entrada en `ARTICULOS` + su archivo `.html` con el mismo slug. Aparece sola en el índice, el buscador, la navegación lateral y anterior/siguiente; `test_centro_de_ayuda_renderiza_todas_las_guias` verifica que renderice.
+
+**Para agregar un campo well-known al catálogo:** además de `catalogo.ETIQUETAS`, añade su explicación en `ayuda.AYUDA_CAMPOS` (un test falla si falta) y, si aplica, su ejemplo en `referencia_campos()`.
+
+**Rutas:** `/ayuda`, `/ayuda/{slug}` y `/ayuda/plantilla-ejemplo.docx` (la plantilla seed, como base para crear otras) son públicas: es documentación y sirve también desde la pantalla de acceso.
 
 ## 3. Modelo de datos (archivos, no BD)
 
@@ -205,10 +230,12 @@ Pseudo-login con cookie **sin firmar** (`rol=admin|invitado`, `httponly`, `sames
 | `/generar` | GET | — | Formulario de una constancia |
 | `/preview.pdf` | POST | — | Vista previa PDF en vivo |
 | `/generar/docx`, `/generar/pdf` | POST | — | Descarga final |
+| `/api/alumnos?q=` | GET | cualquier sesión | Sugerencias del buscador (máx. 8): prefijo de cuenta si son dígitos, nombre en otro caso |
+| `/ayuda`, `/ayuda/{slug}`, `/ayuda/plantilla-ejemplo.docx` | GET | público | Centro de ayuda y plantilla base |
 
 ## 8. Pruebas
 
-`tests/` (pytest, `TestClient` de FastAPI, sin LibreOffice real — solo se prueba `.docx`): 76 casos cubriendo motor de render, gestión de plantillas, catálogo/derivación, carreras, y un flujo de API de punta a punta. Fixtures aíslan cada test con `tmp_path` + monkeypatch de las rutas de datos.
+`tests/` (pytest, `TestClient` de FastAPI, sin LibreOffice real — solo se prueba `.docx`): 82 casos cubriendo motor de render, gestión de plantillas, catálogo/derivación, carreras, un flujo de API de punta a punta, la búsqueda en vivo, la lista de preparación del semestre y que todas las guías del centro de ayuda rendericen. Fixtures aíslan cada test con `tmp_path` + monkeypatch de las rutas de datos.
 
 ```powershell
 python -m venv .venv
@@ -227,3 +254,6 @@ Imagen Docker (`python:3.11-slim` + `libreoffice-writer`), variable `ADMIN_PASSW
 - **Generación por lotes eliminada.** Existió (`/lote`) pero no se usaba en la práctica; se retiró por completo (endpoints, template, tests, menciones en README) para reducir superficie de mantenimiento.
 - **`nuevo_ingreso.csv` como archivo separado, no fusión.** `guardar_datos` trunca el padrón en cada subida; fusionar habría obligado a resubir el Excel de nuevo ingreso cada semestre. El fallback con purga automática resuelve el mismo problema sin ese costo.
 - **Sin SSE ni progreso granular.** El cuello de botella real es el arranque en frío de LibreOffice (2-5s), no el parseo de Excel (decenas de ms para cientos de filas); implementar streaming de progreso no tendría beneficio proporcional a su costo para un mantenedor único.
+- **Ayuda integrada en lugar de manuales externos.** El personal cambia y un manual suelto se pierde o se desactualiza. La ayuda vive dentro de la app (modo ayuda + recorridos + centro de ayuda), escrita una sola vez junto al elemento que explica (macro `ayuda()`), y lo que depende de datos (campos, carreras) se genera del propio código.
+- **Preparación del semestre calculada, no recordada.** En vez de confiar en que el administrador recuerde los pasos, Inicio revisa periodo, padrón, plantillas y carreras faltantes en cada carga (`preparacion_semestre`, `planes_sin_carrera`). Es barato: lee el mismo CSV que ya se lee para buscar.
+- **Recientes en `localStorage`, no en el servidor.** Evita guardar un historial de alumnos en el servidor; cada equipo ve solo lo que descargó y puede borrarlo.

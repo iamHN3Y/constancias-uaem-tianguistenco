@@ -1,0 +1,29 @@
+{% from "_macros.html" import icono %}
+<p>A veces un alumno necesita una constancia antes de aparecer en el padrón principal (por ejemplo, alumnos de primer semestre). Para ellos existe un archivo aparte de <strong>nuevo ingreso</strong>.</p>
+
+<h2 id="como-funciona">Cómo funciona</h2>
+<ul>
+  <li>Se consulta <strong>solo como respaldo</strong>: si la cuenta existe en el padrón principal, siempre se usa el padrón principal.</li>
+  <li>Nunca se mezcla con el padrón principal; vive aparte.</li>
+  <li>Cuando subes un padrón principal nuevo, los alumnos que ya aparezcan ahí se <strong>quitan solos</strong> del archivo de nuevo ingreso. No tienes que limpiarlo a mano.</li>
+  <li>Estos alumnos no traen promedios ni género: hay que revisarlos al generar.</li>
+</ul>
+
+<h2 id="formato">Formato del archivo</h2>
+<p>Excel (<code>.xls</code> o <code>.xlsx</code>) con exactamente <strong>6 columnas en este orden</strong>. No necesita encabezados (si trae una fila de títulos, se ignora sola):</p>
+<table class="tabla">
+  <thead><tr><th scope="col">A</th><th scope="col">B</th><th scope="col">C</th><th scope="col">D</th><th scope="col">E</th><th scope="col">F</th></tr></thead>
+  <tbody>
+    <tr><td>Cuenta</td><td>Apellido paterno</td><td>Apellido materno</td><td>Nombre(s)</td><td>Plan</td><td>Periodo</td></tr>
+    <tr class="fila-ejemplo"><td>2612345</td><td>GARCÍA</td><td>LÓPEZ</td><td>ANA MARÍA</td><td>ICO-F26</td><td>2026B</td></tr>
+  </tbody>
+</table>
+<p>Si el apellido materno no existe, deja la celda vacía.</p>
+
+<h2 id="subir">Cómo subirlo</h2>
+<ol class="pasos">
+  <li>Ve a <a href="/datos">Datos</a> → sección <strong>Alumnos de nuevo ingreso</strong>.</li>
+  <li>Elige el Excel y pulsa <strong>Subir archivo</strong>.</li>
+  <li>Revisa el número de alumnos cargados. En la búsqueda aparecerán con la etiqueta <span class="field-tag">nuevo ingreso</span>.</li>
+</ol>
+<div class="consejo">{{ icono("info") }}<p>Para alumnos de nuevo ingreso el semestre puede salir vacío a propósito: el archivo no siempre indica su semestre real en este plantel, y es mejor que lo escribas tú a que salga un número equivocado.</p></div>

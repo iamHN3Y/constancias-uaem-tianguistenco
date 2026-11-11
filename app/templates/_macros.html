@@ -1,0 +1,66 @@
+{# ============================================================
+   Macros compartidas.
+
+   icono(nombre)  → SVG inline (24x24, currentColor). Agrega íconos al
+                    diccionario _ICONOS; así ninguna página copia rutas SVG.
+
+   ayuda(titulo, texto, articulo="", paso=0)
+                  → atributos para el MODO AYUDA y el RECORRIDO GUIADO.
+                    Un solo texto alimenta ambos: el modo ayuda lo muestra
+                    al hacer clic en la zona, y los elementos con `paso`
+                    forman el recorrido guiado de esa pantalla, en orden.
+                    `articulo` (slug o slug#ancla) agrega el enlace
+                    «Leer la guía completa» al centro de ayuda.
+   ============================================================ #}
+
+{% set _ICONOS = {
+  "inicio": "M12 3l9 8h-3v9h-5v-6h-2v6H6v-9H3l9-8z",
+  "datos": "M4 4a2 2 0 012-2h8l6 6v12a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm9 1v5h5l-5-5zM7 13h10v2H7v-2zm0 4h7v2H7v-2z",
+  "plantilla": "M5 3h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2zm2 4v2h10V7H7zm0 4v2h10v-2H7zm0 4v2h6v-2H7z",
+  "carreras": "M12 3L1 9l11 6 9-4.9V17h2V9L12 3zm-7 9.6V17c0 1.7 3.1 3 7 3s7-1.3 7-3v-4.4l-7 3.8-7-3.8z",
+  "ayuda": "M12 2a10 10 0 100 20 10 10 0 000-20zm0 16.5a1.25 1.25 0 110-2.5 1.25 1.25 0 010 2.5zm1.8-6.3c-.7.5-.9.8-.9 1.4v.4h-1.8v-.5c0-1.2.5-1.9 1.4-2.5.7-.5 1-.8 1-1.4 0-.7-.5-1.1-1.3-1.1-.8 0-1.3.4-1.7 1.1l-1.5-.9C9 7.9 10.1 7.2 11.6 7.2c1.9 0 3.2 1 3.2 2.7 0 1.1-.5 1.7-1.6 2.3z",
+  "puntero": "M4 2l14 8.5-6.2 1.4L15.4 19l-2.7 1.4-3.6-7.2L4 17.5V2zm15 11a4 4 0 110 8 4 4 0 010-8zm-.6 5.6v1.2h1.2v-1.2h-1.2zm.6-4.2c-.9 0-1.6.6-1.7 1.4l1 .2c.1-.4.3-.6.7-.6.4 0 .6.2.6.5 0 .5-1 .6-1 1.6h1c0-.7 1.1-.8 1.1-1.7 0-.8-.7-1.4-1.7-1.4z",
+  "libro": "M6 2h12a2 2 0 012 2v16a2 2 0 01-2 2H6a2 2 0 01-2-2V4a2 2 0 012-2zm0 2v16h12V4h-2v7l-2.5-1.5L11 11V4H6z",
+  "buscar": "M10 2a8 8 0 105.3 14l5.4 5.4 1.4-1.4-5.4-5.4A8 8 0 0010 2zm0 2a6 6 0 110 12 6 6 0 010-12z",
+  "calendario": "M7 2a1 1 0 011 1v1h8V3a1 1 0 112 0v1h1a2 2 0 012 2v13a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2h1V3a1 1 0 011-1zm12 7H5v10h14V9z",
+  "check": "M9 16.2L4.8 12l-1.4 1.4L9 19 21 7l-1.4-1.4L9 16.2z",
+  "check-circulo": "M12 2a10 10 0 100 20 10 10 0 000-20zm-1.5 14.5L6 12l1.4-1.4 3.1 3.1 6.1-6.1L18 9l-7.5 7.5z",
+  "alerta": "M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z",
+  "error": "M12 2a10 10 0 100 20 10 10 0 000-20zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z",
+  "info": "M12 2a10 10 0 100 20 10 10 0 000-20zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z",
+  "descargar": "M5 20h14v-2H5v2zM12 2v12.2l4-4 1.4 1.4L12 17 6.6 11.6 8 10.2l4 4V2z",
+  "subir": "M5 20h14v-2H5v2zm7-18l-5.4 5.4L8 8.8l3-3V16h2V5.8l3 3 1.4-1.4L12 2z",
+  "atras": "M15.4 7.4L14 6l-6 6 6 6 1.4-1.4-4.6-4.6 4.6-4.6z",
+  "adelante": "M8.6 16.6L10 18l6-6-6-6-1.4 1.4 4.6 4.6-4.6 4.6z",
+  "cerrar": "M18.3 5.7L12 12l6.3 6.3-1.4 1.4L10.6 13.4 4.3 19.7 2.9 18.3 9.2 12 2.9 5.7 4.3 4.3l6.3 6.3 6.3-6.3z",
+  "reloj": "M12 2a10 10 0 100 20 10 10 0 000-20zm0 2a8 8 0 110 16 8 8 0 010-16zm-1 3v6l5 3 1-1.6-4-2.4V7h-2z",
+  "basura": "M6 7h12l-1 13a2 2 0 01-2 2H9a2 2 0 01-2-2L6 7zm3-3h6l1 2h4v2H4V6h4l1-2z",
+  "mas": "M11 5h2v6h6v2h-6v6h-2v-6H5v-2h6V5z",
+  "salir": "M10 3H5a2 2 0 00-2 2v14a2 2 0 002 2h5v-2H5V5h5V3zm6.6 4.6L15.2 9l2 2H9v2h8.2l-2 2 1.4 1.4L21 12l-4.4-4.4z",
+  "escudo": "M12 1L3 5v6c0 5.5 3.8 10.7 9 12 5.2-1.3 9-6.5 9-12V5l-9-4z",
+  "persona": "M12 12a5 5 0 100-10 5 5 0 000 10zm0 2c-4.4 0-8 2.2-8 5v1h16v-1c0-2.8-3.6-5-8-5z",
+  "recorrido": "M8 5v14l11-7L8 5z",
+  "ojo": "M12 5c-5 0-9 4.5-10 7 1 2.5 5 7 10 7s9-4.5 10-7c-1-2.5-5-7-10-7zm0 11a4 4 0 110-8 4 4 0 010 8zm0-6a2 2 0 100 4 2 2 0 000-4z",
+  "historial": "M13 3a9 9 0 00-9 9H1l4 4 4-4H6a7 7 0 117 7 7 7 0 01-4.9-2l-1.4 1.4A9 9 0 1013 3zm-1 5v5l4.3 2.5.7-1.2-3.5-2.1V8H12z",
+  "word": "M4 3h11l5 5v13a1 1 0 01-1 1H4a1 1 0 01-1-1V4a1 1 0 011-1zm2.5 8l1.6 7h1.6l1.3-4.7 1.3 4.7h1.6l1.6-7h-1.6l-.9 4.6-1.3-4.6h-1.4l-1.3 4.6-.9-4.6H6.5z",
+  "pdf": "M4 3h11l5 5v13a1 1 0 01-1 1H4a1 1 0 01-1-1V4a1 1 0 011-1zm2 10v5h1.5v-1.6h.8c1.1 0 1.9-.7 1.9-1.7S9.4 13 8.3 13H6zm1.5 1.2h.7c.4 0 .6.2.6.5s-.2.5-.6.5h-.7v-1zM11 13v5h1.8c1.5 0 2.5-1 2.5-2.5S14.3 13 12.8 13H11zm1.5 1.2h.3c.7 0 1.1.5 1.1 1.3s-.4 1.3-1.1 1.3h-.3v-2.6zM16 13v5h1.5v-1.9h1.8V15h-1.8v-.8H19.5V13H16z",
+  "luna": "M21 12.8A9 9 0 1111.2 3a7 7 0 109.8 9.8z",
+  "lista": "M3 5h2v2H3V5zm4 0h14v2H7V5zM3 11h2v2H3v-2zm4 0h14v2H7v-2zm-4 6h2v2H3v-2zm4 0h14v2H7v-2z"
+} %}
+
+{% macro icono(nombre, clase="") -%}
+<svg class="ico {{ clase }}" viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="{{ _ICONOS.get(nombre, _ICONOS['info']) }}"/></svg>
+{%- endmacro %}
+
+{% macro ayuda(titulo, texto, articulo="", paso=0) -%}
+data-ayuda="{{ titulo }}" data-ayuda-texto="{{ texto }}"{% if articulo %} data-ayuda-articulo="{{ articulo }}"{% endif %}{% if paso %} data-recorrido="{{ paso }}"{% endif %}
+{%- endmacro %}
+
+{# Aviso en línea. tipo: info | exito | error | alerta. Uso:
+   {% call aviso("exito") %}Texto con <strong>HTML</strong>{% endcall %} #}
+{% macro aviso(tipo) -%}
+<div class="note {% if tipo == 'error' or tipo == 'alerta' %}note-error{% elif tipo == 'exito' %}note-exito{% endif %}" role="{{ 'alert' if tipo == 'error' else 'status' }}">
+  {{ icono({'error': 'error', 'alerta': 'alerta', 'exito': 'check-circulo'}.get(tipo, 'info')) }}
+  <span>{{ caller() }}</span>
+</div>
+{%- endmacro %}

@@ -1,466 +1,196 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Generar — {{ alumno.NombreAlumno }}</title>
-  <link rel="stylesheet" href="/static/styles.css?v=10">
-  <style>
-    .page { max-width: 1600px; }
-    .layout { display: grid; grid-template-columns: 400px 1fr; gap: 16px; align-items: start; }
-    @media (max-width: 1100px) { .layout { grid-template-columns: 1fr; } }
-    .preview-col { position: sticky; top: 84px; }
+{% extends "base.html" %}
+{% from "_macros.html" import icono, ayuda, aviso %}
 
-    .radio-row { display: flex; gap: 10px; flex-wrap: wrap; }
-    .radio-row label {
-      display: flex; align-items: center; gap: 8px; cursor: pointer;
-      padding: 9px 16px; border: 1.5px solid var(--outline-variant);
-      border-radius: var(--radius-pill); color: var(--on-surface);
-      font-weight: 500; font-size: 14px; transition: border-color .15s, background .15s;
-    }
-    .radio-row label:hover { border-color: var(--outline); }
-    .radio-row input { accent-color: var(--primary); width: 18px; height: 18px; }
-    .radio-row input:checked + span { color: var(--primary); font-weight: 600; }
+{% block titulo %}{{ alumno.NombreAlumno | nombre_legible }}{% endblock %}
+{% block recorrido %}generar-v2{% endblock %}
+{% block ancho %}page--ancha{% endblock %}
 
-    .date-row { display: flex; gap: 10px; align-items: flex-end; }
-    .date-row > div { flex: 1; }
-    .date-row .small { font-size: 12px; color: var(--on-surface-variant); margin-bottom: 6px; font-weight: 600; }
+{% block migas %}
+<ol class="flujo flujo--compacto" aria-label="Pasos">
+  <li class="flujo-paso flujo-paso--hecho"><a href="/?plantilla={{ plantilla_slug }}"><span>{{ icono("check") }}</span>Buscar alumno</a></li>
+  <li class="flujo-paso flujo-paso--actual" aria-current="step"><span>2</span>Revisar datos</li>
+  <li class="flujo-paso"><span>3</span>Descargar</li>
+</ol>
+{% endblock %}
 
-    .comodin-bar { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; }
-    .comodin-bar select { flex: 1; }
+{% block subtitulo %}Cuenta {{ alumno.Cuenta }} · {{ plantilla_nombre or "Constancia" }}{% endblock %}
 
-    .pdf-frame-wrap {
-      position: relative;
-      width: 100%; height: calc(100vh - 150px); min-height: 720px;
-      border-radius: var(--radius-sm);
-      transition: box-shadow var(--dur-slow) var(--ease-emph);
-    }
-    .pdf-frame-wrap.pdf-frame-wrap--cargando {
-      box-shadow: 0 0 0 3px color-mix(in srgb, var(--secondary) 45%, transparent);
-    }
-    .pdf-frame {
-      width: 100%; height: 100%;
-      border: 1px solid var(--outline-variant); border-radius: var(--radius-sm);
-      background: var(--surface);
-      opacity: 1;
-      transition: opacity var(--dur-base) var(--ease-emph);
-    }
-    .pdf-frame--cargando { opacity: .35; }
-    .pdf-skeleton {
-      position: absolute;
-      inset: 0;
-      border-radius: var(--radius-sm);
-      display: none;
-      align-items: center;
-      justify-content: center;
-      text-align: center;
-      padding: 24px;
-      pointer-events: none;
-    }
-    .pdf-skeleton.visible { display: flex; }
-    .pdf-skeleton span {
-      background: var(--surface-1);
-      border: 1px solid var(--outline-variant);
-      border-radius: var(--radius-pill);
-      padding: 8px 18px;
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--on-surface-variant);
-      box-shadow: var(--elev-1);
-    }
+{% block acciones_pagina %}
+  {% if plantillas_listas | length > 1 %}
+  <label class="selector-plantilla" {{ ayuda("Cambiar tipo de constancia", "Genera otro tipo de documento para el mismo alumno sin volver a buscarlo. Los cambios que hayas escrito en el formulario no se conservan.", "generar-constancia#tipo") }}>
+    <span class="sr-only">Tipo de constancia</span>
+    <select id="cambiarPlantilla" aria-label="Tipo de constancia">
+      {% for it in plantillas_listas %}
+        <option value="{{ it.slug }}" {% if it.slug == plantilla_slug %}selected{% endif %}>{{ it.nombre }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  {% endif %}
+  <a class="btn-ghost" href="/?plantilla={{ plantilla_slug }}">{{ icono("atras") }}Otro alumno</a>
+{% endblock %}
 
-    .field-opcional .field-tag {
-      font-size: 11px; font-weight: 600; color: var(--on-secondary-container);
-      background: var(--secondary-container); padding: 1px 8px; border-radius: var(--radius-pill);
-    }
-
-    .alumno-info {
-      display: grid; grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 10px 16px; font-size: 13px; color: var(--on-surface-variant);
-      padding: 14px 18px; border: 1px solid var(--outline-variant);
-      border-radius: var(--radius-md); background: var(--surface-1); margin-bottom: 16px;
-      box-shadow: var(--elev-1);
-    }
-    .alumno-info b { color: var(--on-surface); display: block; font-size: 11px; text-transform: uppercase; letter-spacing: .4px; margin-bottom: 2px; }
-    .alumno-info .v { font-size: 15px; color: var(--on-surface); }
-    @media (max-width: 560px) { .alumno-info { grid-template-columns: 1fr 1fr; } }
-  </style>
-</head>
-<body>
-  <div class="page">
-    <header class="header">
-      <div class="brand">
-        <h1>{{ plantilla_nombre or "Constancia" }}</h1>
-        <p>{{ alumno.NombreAlumno }} · cuenta {{ alumno.Cuenta }}</p>
+{% macro campo(c) %}
+  {% set incluido = (c.iso_inicio and c.iso_fin) if c.tipo == "date_rango" else (c.valor|trim != "") %}
+  <div class="field {% if c.opcional %}field-opcional{% if not incluido %} field--off{% endif %}{% endif %}"
+       data-campo="{{ c.name }}" data-etiqueta="{{ c.label }}"
+       {{ ayuda(c.label, ayuda_campo(c.name), "campos-de-plantilla" if c.de_plantilla else "generar-constancia#campos", paso=3 if c.tipo == "radio_genero" else 0) }}>
+    {% if c.opcional %}
+      <div class="field-head">
+        <label for="f_{{ c.name }}">{{ c.label }}{% if c.de_plantilla %} <span class="field-tag" title="Campo agregado en la plantilla como [[{{ c.name }}]]">de la plantilla</span>{% endif %}</label>
+        <label class="switch" title="Incluir u omitir esta línea en la constancia">
+          <span class="sr-only">Incluir «{{ c.label }}» en la constancia</span>
+          <input type="checkbox" class="opt-toggle" {% if incluido %}checked{% endif %}>
+          <span class="track"></span>
+          <span class="switch-texto" aria-hidden="true">{{ "Incluida" if incluido else "Omitida" }}</span>
+        </label>
       </div>
-      <div class="appbar-actions">
-        <a class="btn-ghost" href="/">
-          <svg viewBox="0 0 24 24"><path d="M18.3 5.7L12 12l6.3 6.3-1.4 1.4L10.6 13.4 4.3 19.7 2.9 18.3 9.2 12 2.9 5.7 4.3 4.3l6.3 6.3 6.3-6.3z"/></svg>
-          Cancelar
-        </a>
-        <button class="icon-btn" type="button" data-tour title="Ver tutorial" aria-label="Ver tutorial">
-          <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm0 16.5a1.25 1.25 0 110-2.5 1.25 1.25 0 010 2.5zm1.8-6.3c-.7.5-.9.8-.9 1.4v.4h-1.8v-.5c0-1.2.5-1.9 1.4-2.5.7-.5 1-.8 1-1.4 0-.7-.5-1.1-1.3-1.1-.8 0-1.3.4-1.7 1.1l-1.5-.9C9 7.9 10.1 7.2 11.6 7.2c1.9 0 3.2 1 3.2 2.7 0 1.1-.5 1.7-1.6 2.3z"/></svg>
-        </button>
-        <button id="themeToggle" class="icon-btn" type="button"></button>
-      </div>
-    </header>
-
-    {% if not ajustes.get('periodo_actual') %}
-      <div class="note note-error">
-        <svg viewBox="0 0 24 24"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>
-        <span>No hay <strong>periodo activo</strong> configurado: el semestre y las fechas del periodo no se pueden calcular solos. Pídele al administrador que lo defina en la pantalla principal (se hace una sola vez por semestre).</span>
-      </div>
+    {% elif c.tipo != "radio_genero" %}
+      <label for="f_{{ c.name }}">{{ c.label }}{% if c.de_plantilla %} <span class="field-tag" title="Campo agregado en la plantilla como [[{{ c.name }}]]">de la plantilla</span>{% endif %}</label>
     {% endif %}
 
-    <div class="alumno-info entrada-escalonada" style="--i:0">
-      <div><b>Plan</b><span class="v">{{ alumno.Plan }}</span></div>
-      <div><b>Periodo inicio</b><span class="v">{{ alumno.PerInicio }}</span></div>
-      <div><b>Periodo activo</b><span class="v">{{ ajustes.get('periodo_actual', '—') }}</span></div>
-      <div><b>PrmGR</b><span class="v">{{ alumno.PrmGR }}</span></div>
-      <div><b>Per (último)</b><span class="v">{{ alumno.Per }}</span></div>
-      <div><b>Sit</b><span class="v">{{ alumno.Sit }}</span></div>
+    {% if c.tipo == "radio_genero" %}
+      <fieldset class="radio-grupo">
+        <legend>{{ c.label }} <span class="hint">— ajusta «el alumno / la alumna» en el texto</span></legend>
+        <div class="radio-row">
+          <label><input type="radio" name="__genero__" value="M" required {% if c.genero == "M" %}checked{% endif %}><span>Masculino</span></label>
+          <label><input type="radio" name="__genero__" value="F" {% if c.genero == "F" %}checked{% endif %}><span>Femenino</span></label>
+        </div>
+      </fieldset>
+      <input type="hidden" name="campo_{{ c.name }}" value="">
+    {% elif c.tipo == "textarea" %}
+      {% if c.name == "LINEA_LIBRE" %}
+        <div class="comodin-bar" {{ ayuda("Frases guardadas", "Inserta con un clic un texto que usas seguido, o guarda el que escribiste para la próxima vez. Las frases las comparten todos los usuarios.", "lineas-opcionales-y-frases#frases", paso=5) }}>
+          <select id="comodinSelector" aria-label="Insertar una frase guardada"><option value="">Insertar frase guardada…</option></select>
+          <button type="button" id="btnGuardarComodin" class="btn-tonal btn-compacto">{{ icono("mas") }}Guardar frase</button>
+          <button type="button" id="btnEliminarComodin" class="icon-btn" title="Eliminar la frase seleccionada" aria-label="Eliminar la frase seleccionada">{{ icono("basura") }}</button>
+        </div>
+      {% endif %}
+      <textarea id="f_{{ c.name }}" name="campo_{{ c.name }}" rows="2"
+        {% if c.opcional %}placeholder="Escribe el texto o apaga el interruptor para omitir esta línea"{% endif %}>{{ c.valor }}</textarea>
+    {% elif c.tipo == "date_corto" or c.tipo == "date_largo" %}
+      <input id="f_{{ c.name }}" type="date" name="fecha_{{ c.name }}" value="{{ c.iso }}">
+    {% elif c.tipo == "date_rango" %}
+      <div class="fila-2">
+        <div>
+          <label class="sublabel" for="f_{{ c.name }}">Desde</label>
+          <input id="f_{{ c.name }}" type="date" name="fecha_VAC_INICIO" value="{{ c.iso_inicio }}">
+        </div>
+        <div>
+          <label class="sublabel" for="f_{{ c.name }}_fin">Hasta</label>
+          <input id="f_{{ c.name }}_fin" type="date" name="fecha_VAC_FIN" value="{{ c.iso_fin }}">
+        </div>
+      </div>
+    {% else %}
+      <input id="f_{{ c.name }}" type="text" name="campo_{{ c.name }}" value="{{ c.valor }}">
+    {% endif %}
+  </div>
+{% endmacro %}
+
+{% block contenido %}
+  {% if not ajustes.get('periodo_actual') %}
+    {% call aviso("alerta") %}No hay <strong>periodo activo</strong>: el semestre y las fechas del periodo no se pudieron calcular. Llénalos a mano o pídele al administrador que configure el periodo (se hace una vez por semestre). <a href="/ayuda/problemas-frecuentes#semestre-vacio">Más información</a>{% endcall %}
+  {% endif %}
+  {% if alumno._origen == "nuevo_ingreso" %}
+    {% call aviso("info") %}Este alumno viene del archivo de <strong>nuevo ingreso</strong>: no trae promedios ni género, y el semestre puede requerir revisión.{% endcall %}
+  {% endif %}
+
+  <dl class="alumno-info entrada-escalonada" style="--i:0"
+      {{ ayuda("Datos del alumno", "Lo que dice el padrón sobre este alumno. Es solo de referencia: si algo está mal aquí, corrígelo en el formulario (solo para esta constancia) y avísale al administrador para que lo corrijan en control escolar.", "generar-constancia#revisar", paso=1) }}>
+    <div><dt>Plan</dt><dd>{{ alumno.Plan or "—" }}</dd></div>
+    <div><dt>Ingresó en</dt><dd>{{ alumno.PerInicio or "—" }}</dd></div>
+    <div><dt>Periodo activo</dt><dd>{{ ajustes.get('periodo_actual') or "—" }}</dd></div>
+    <div><dt>Promedio general</dt><dd>{{ alumno.PrmGR or "—" }}</dd></div>
+    <div><dt>Último periodo</dt><dd>{{ alumno.Per or "—" }}</dd></div>
+    <div><dt>Situación</dt><dd>{{ alumno.Sit or "—" }}</dd></div>
+  </dl>
+
+  {% set fijos = campos | rejectattr("opcional") | list %}
+  {% set datos_campos = fijos | rejectattr("tipo", "in", ["date_corto", "date_largo"]) | list %}
+  {% set fechas = fijos | selectattr("tipo", "in", ["date_corto", "date_largo"]) | list %}
+  {% set opcionales = campos | selectattr("opcional") | list %}
+
+  <div class="layout-generar">
+    <div class="form-col">
+      <form id="formCampos" novalidate>
+        <input type="hidden" name="cuenta" value="{{ alumno.Cuenta }}">
+        <input type="hidden" name="plantilla" value="{{ plantilla_slug }}">
+
+        {% if datos_campos %}
+        <section class="card grupo entrada-escalonada" style="--i:1"
+                 {{ ayuda("Datos que se imprimen", "Vienen prellenados desde el padrón y el catálogo de carreras. Revisa que estén bien; cualquier cambio aplica solo a esta constancia. Pasa el cursor por cada campo en modo ayuda para saber de dónde sale.", "generar-constancia#campos", paso=2) }}>
+          <h2>{{ icono("persona") }}Datos del alumno</h2>
+          {% for c in datos_campos %}{{ campo(c) }}{% endfor %}
+        </section>
+        {% endif %}
+
+        {% if fechas %}
+        <section class="card grupo entrada-escalonada" style="--i:2">
+          <h2>{{ icono("calendario") }}Fechas</h2>
+          <p class="hint">Elige la fecha en el calendario; el texto formal («02 de febrero de 2026») se escribe solo.</p>
+          {% for c in fechas %}{{ campo(c) }}{% endfor %}
+        </section>
+        {% endif %}
+
+        {% if opcionales %}
+        <section class="card grupo entrada-escalonada" style="--i:3"
+                 {{ ayuda("Líneas opcionales", "Cada línea tiene un interruptor: encendido, la línea se imprime; apagado, desaparece por completo del documento (sin dejar huecos). No necesitas borrar el texto.", "lineas-opcionales-y-frases", paso=4) }}>
+          <h2>{{ icono("lista") }}Líneas opcionales</h2>
+          <p class="hint">Enciende solo las que deban aparecer en esta constancia.</p>
+          {% for c in opcionales %}{{ campo(c) }}{% endfor %}
+        </section>
+        {% endif %}
+
+        <div class="barra-descarga" id="barraDescarga"
+             {{ ayuda("Descargar", "PDF es para imprimir o enviar por correo tal cual. Word (.docx) es para seguir editando a mano. Antes de descargar, el sistema te avisa si quedó algún campo importante vacío.", "generar-constancia#descargar", paso=7) }}>
+          <div class="barra-estado" id="estadoRevision" role="status" aria-live="polite"></div>
+          <div class="barra-botones">
+            <a class="btn-ghost solo-movil" href="#vistaPrevia">{{ icono("ojo") }}Vista previa</a>
+            <button type="button" id="btnDocx" class="btn-tonal">{{ icono("word") }}Word</button>
+            <button type="button" id="btnPdf">{{ icono("pdf") }}Descargar PDF</button>
+          </div>
+        </div>
+      </form>
     </div>
 
-    <div class="layout">
-      <div class="form-col">
-        <div class="card entrada-escalonada" style="--i:1">
-          <h2>
-            <svg viewBox="0 0 24 24"><path d="M3 5a2 2 0 012-2h14a2 2 0 012 2v14a2 2 0 01-2 2H5a2 2 0 01-2-2V5zm4 3h10v2H7V8zm0 4h10v2H7v-2zm0 4h6v2H7v-2z"/></svg>
-            Campos
-          </h2>
-          <form id="formCampos">
-            <input type="hidden" name="cuenta" value="{{ alumno.Cuenta }}">
-            <input type="hidden" name="plantilla" value="{{ plantilla_slug }}">
-
-            {% for c in campos %}
-              {% set incluido = (c.iso_inicio and c.iso_fin) if c.tipo == "date_rango" else (c.valor|trim != "") %}
-              <div class="field {% if c.opcional %}field-opcional{% if not incluido %} field--off{% endif %}{% endif %}">
-                {% if c.opcional %}
-                  <div class="field-head">
-                    <label>{{ c.label }} <span class="field-tag">opcional</span>{% if c.de_plantilla %} <span class="field-tag" title="Campo detectado automáticamente en la plantilla [[{{ c.name }}]]">plantilla</span>{% endif %}</label>
-                    <label class="switch" title="Incluir u omitir esta línea en la constancia">
-                      <input type="checkbox" class="opt-toggle" {% if incluido %}checked{% endif %}>
-                      <span class="track"></span>
-                    </label>
-                  </div>
-                {% else %}
-                  <label>{{ c.label }}{% if c.de_plantilla %} <span class="field-tag" title="Campo detectado automáticamente en la plantilla [[{{ c.name }}]]">plantilla</span>{% endif %}</label>
-                {% endif %}
-
-                {% if c.tipo == "radio_genero" %}
-                  <div class="radio-row">
-                    <label><input type="radio" name="__genero__" value="M" required {% if c.genero == "M" %}checked{% endif %}><span>Masculino</span></label>
-                    <label><input type="radio" name="__genero__" value="F" {% if c.genero == "F" %}checked{% endif %}><span>Femenino</span></label>
-                  </div>
-                  <input type="hidden" name="campo_{{ c.name }}" value="">
-                {% elif c.tipo == "textarea" %}
-                  {% if c.name == "LINEA_LIBRE" %}
-                    <div class="comodin-bar">
-                      <select id="comodinSelector"><option value="">— Insertar comodín —</option></select>
-                      <button type="button" id="btnGuardarComodin" class="btn-tonal" style="min-height:38px;padding:8px 14px;">+ Guardar</button>
-                      <button type="button" id="btnEliminarComodin" class="icon-btn" title="Eliminar el comodín seleccionado" aria-label="Eliminar comodín">
-                        <svg viewBox="0 0 24 24"><path d="M6 7h12l-1 13a2 2 0 01-2 2H9a2 2 0 01-2-2L6 7zm3-3h6l1 2h4v2H4V6h4l1-2z"/></svg>
-                      </button>
-                    </div>
-                  {% endif %}
-                  <textarea name="campo_{{ c.name }}" rows="2"
-                    {% if c.opcional %}placeholder="Déjalo vacío para omitir esta línea"{% endif %}>{{ c.valor }}</textarea>
-                {% elif c.tipo == "date_corto" or c.tipo == "date_largo" %}
-                  <input type="date" name="fecha_{{ c.name }}" value="{{ c.iso }}">
-                {% elif c.tipo == "date_rango" %}
-                  <div class="date-row">
-                    <div>
-                      <div class="small">Inicio</div>
-                      <input type="date" name="fecha_VAC_INICIO" value="{{ c.iso_inicio }}">
-                    </div>
-                    <div>
-                      <div class="small">Fin</div>
-                      <input type="date" name="fecha_VAC_FIN" value="{{ c.iso_fin }}">
-                    </div>
-                  </div>
-                {% else %}
-                  <input type="text" name="campo_{{ c.name }}" value="{{ c.valor }}">
-                {% endif %}
-              </div>
-            {% endfor %}
-
-            <div class="hr"></div>
-            <div class="actions">
-              <button type="button" id="btnDocx">
-                <svg viewBox="0 0 24 24"><path d="M5 20h14v-2H5v2zM12 2v12.2l4-4 1.4 1.4L12 17 6.6 11.6 8 10.2l4 4V2h0z"/></svg>
-                Descargar .docx
-              </button>
-              <button type="button" id="btnPdf" class="btn-tonal">
-                <svg viewBox="0 0 24 24"><path d="M5 20h14v-2H5v2zM12 2v12.2l4-4 1.4 1.4L12 17 6.6 11.6 8 10.2l4 4V2h0z"/></svg>
-                Descargar .pdf
-              </button>
-            </div>
-          </form>
+    <div class="preview-col" id="vistaPrevia">
+      <section class="card entrada-escalonada" style="--i:2"
+               {{ ayuda("Vista previa en vivo", "Así quedará el documento. Se actualiza sola un momento después de cada cambio en el formulario. Si no carga, revisa la guía de problemas frecuentes.", "problemas-frecuentes#vista-previa", paso=6) }}>
+        <div class="card-cab">
+          <h2>{{ icono("ojo") }}Vista previa</h2>
+          <span id="status" class="preview-status" role="status" aria-live="polite">preparando…</span>
         </div>
-      </div>
-
-      <div class="preview-col">
-        <div class="card entrada-escalonada" style="--i:2">
-          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
-            <h2 style="margin:0;">
-              <svg viewBox="0 0 24 24"><path d="M12 5c-5 0-9 4.5-10 7 1 2.5 5 7 10 7s9-4.5 10-7c-1-2.5-5-7-10-7zm0 11a4 4 0 110-8 4 4 0 010 8zm0-6a2 2 0 100 4 2 2 0 000-4z"/></svg>
-              Vista previa
-            </h2>
-            <span id="status" class="preview-status" role="status" aria-live="polite">listo</span>
-          </div>
-          <div id="pdfFrameWrap" class="pdf-frame-wrap">
-            <iframe id="pdfFrame" class="pdf-frame" title="Vista previa PDF"></iframe>
-            <div id="pdfSkeleton" class="pdf-skeleton"><span id="pdfSkeletonTexto" class="skeleton">Generando vista previa…</span></div>
-          </div>
+        <div id="pdfFrameWrap" class="pdf-frame-wrap">
+          <iframe id="pdfFrame" class="pdf-frame" title="Vista previa de la constancia en PDF"></iframe>
+          <div id="pdfSkeleton" class="pdf-skeleton"><span id="pdfSkeletonTexto" class="skeleton">Generando vista previa…</span></div>
         </div>
-      </div>
+      </section>
     </div>
   </div>
 
-  <script src="/static/theme.js?v=10"></script>
-  <script src="/static/ui.js?v=10"></script>
-  <script>
-    const form = document.getElementById("formCampos");
-    const frameWrap = document.getElementById("pdfFrameWrap");
-    const frame = document.getElementById("pdfFrame");
-    const skeleton = document.getElementById("pdfSkeleton");
-    const skeletonTexto = document.getElementById("pdfSkeletonTexto");
-    const status = document.getElementById("status");
-    const btnDocx = document.getElementById("btnDocx");
-    const btnPdf = document.getElementById("btnPdf");
+  <dialog id="dlgListo" class="dialog-listo" aria-labelledby="dlgListoTitulo">
+    <div class="dialog-body">
+      <div class="listo-ico">{{ icono("check-circulo") }}</div>
+      <h3 id="dlgListoTitulo">Constancia descargada</h3>
+      <p id="dlgListoTexto">Revisa tu carpeta de Descargas.</p>
+      <div class="dialog-actions dialog-actions--columna">
+        <a class="btn" href="/?plantilla={{ plantilla_slug }}">{{ icono("buscar") }}Buscar otro alumno</a>
+        {% if plantillas_listas | length > 1 %}
+        <button type="button" class="btn-tonal" id="btnOtraPlantilla">{{ icono("plantilla") }}Otro tipo de constancia para este alumno</button>
+        {% endif %}
+        <button type="button" class="btn-ghost" id="btnSeguirEditando">Seguir editando</button>
+      </div>
+    </div>
+  </dialog>
+{% endblock %}
 
-    let lastObjectUrl = null;
-    let pendingTimer = null;
-    let abortCtrl = null;
-    let mensajeTimers = [];
-
-    function setStatus(text, error = false) {
-      status.textContent = text;
-      status.style.borderColor = error ? "var(--error)" : "var(--outline-variant)";
-      status.style.background = error ? "var(--error-container)" : "var(--surface)";
-      status.style.color = error ? "var(--on-error-container)" : "var(--on-surface-variant)";
-    }
-
-    function limpiarMensajeTimers() {
-      mensajeTimers.forEach((t) => clearTimeout(t));
-      mensajeTimers = [];
-    }
-
-    function mostrarCarga() {
-      frameWrap.classList.add("pdf-frame-wrap--cargando");
-      frame.classList.add("pdf-frame--cargando");
-      skeleton.classList.add("visible");
-      skeletonTexto.textContent = "Generando vista previa…";
-      limpiarMensajeTimers();
-      // La conversión real (arranque en frío de LibreOffice) puede tardar
-      // 2-5s; adelantamos el mensaje largo antes de ese punto.
-      mensajeTimers.push(setTimeout(() => {
-        skeletonTexto.textContent = "Un momento, casi lista…";
-      }, 1200));
-      mensajeTimers.push(setTimeout(() => {
-        skeletonTexto.textContent = "LibreOffice está componiendo el documento…";
-      }, 2500));
-    }
-
-    function ocultarCarga() {
-      limpiarMensajeTimers();
-      frameWrap.classList.remove("pdf-frame-wrap--cargando");
-      frame.classList.remove("pdf-frame--cargando");
-      skeleton.classList.remove("visible");
-    }
-
-    async function refreshPreview() {
-      if (abortCtrl) abortCtrl.abort();
-      abortCtrl = new AbortController();
-      setStatus("generando…");
-      mostrarCarga();
-      try {
-        const res = await fetch("/preview.pdf", {
-          method: "POST",
-          body: new FormData(form),
-          signal: abortCtrl.signal,
-        });
-        if (!res.ok) {
-          setStatus("error " + res.status, true);
-          ocultarCarga();
-          return;
-        }
-        const blob = await res.blob();
-        const url = URL.createObjectURL(blob);
-        // Mantener la página actual del visor cuando se regenera
-        const prevSrc = frame.src;
-        const hash = prevSrc.includes("#") ? "#" + prevSrc.split("#")[1] : "";
-        const anteriorUrl = lastObjectUrl;
-        // El iframe pinta el PDF de forma asíncrona: espera a "load" antes de
-        // quitar el skeleton, con un timeout de respaldo por si no dispara.
-        let resuelto = false;
-        const terminar = () => {
-          if (resuelto) return;
-          resuelto = true;
-          frame.removeEventListener("load", terminar);
-          setStatus("actualizado");
-          ocultarCarga();
-          if (anteriorUrl) URL.revokeObjectURL(anteriorUrl);
-        };
-        frame.addEventListener("load", terminar, { once: true });
-        setTimeout(terminar, 1500);
-        frame.src = url + hash;
-        lastObjectUrl = url;
-      } catch (e) {
-        if (e.name !== "AbortError") { setStatus("error", true); ocultarCarga(); }
-      }
-    }
-
-    function debouncedRefresh() {
-      if (pendingTimer) clearTimeout(pendingTimer);
-      pendingTimer = setTimeout(refreshPreview, 700);
-    }
-
-    form.addEventListener("input", debouncedRefresh);
-    form.addEventListener("change", debouncedRefresh);
-
-    async function descargar(url, ext, boton) {
-      const fd = new FormData(form);
-      // validar género al descargar (solo si la plantilla pide ese campo)
-      if (form.querySelector('input[name="__genero__"]') && !fd.get("__genero__")) {
-        avisar("Selecciona el género antes de descargar.", "error");
-        return;
-      }
-      boton.setAttribute("aria-busy", "true");
-      boton.disabled = true;
-      try {
-        const res = await fetch(url, { method: "POST", body: fd });
-        if (!res.ok) {
-          avisar("Error generando archivo: " + res.status, "error");
-          return;
-        }
-        const blob = await res.blob();
-        const a = document.createElement("a");
-        a.href = URL.createObjectURL(blob);
-        a.download = "Constancia_{{ alumno.Cuenta }}." + ext;
-        a.click();
-        setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-        avisar("Constancia descargada", "exito");
-      } finally {
-        boton.removeAttribute("aria-busy");
-        boton.disabled = false;
-      }
-    }
-
-    btnDocx.addEventListener("click", () => descargar("/generar/docx", "docx", btnDocx));
-    btnPdf.addEventListener("click", () => descargar("/generar/pdf", "pdf", btnPdf));
-
-    // ---------- Líneas opcionales: switch incluir / omitir ----------
-    // Al apagar el switch deshabilitamos los controles del campo; los campos
-    // deshabilitados no se envían en el FormData, así el backend elimina la
-    // línea sin que el usuario tenga que borrar su texto.
-    function controlesDe(field) {
-      return field.querySelectorAll(
-        'textarea[name^="campo_"], input[name^="campo_"]:not([type=hidden]), input[name^="fecha_"]'
-      );
-    }
-    function aplicarToggle(toggle) {
-      const field = toggle.closest(".field");
-      const on = toggle.checked;
-      field.classList.toggle("field--off", !on);
-      controlesDe(field).forEach(el => { el.disabled = !on; });
-    }
-    form.querySelectorAll(".opt-toggle").forEach(t => {
-      aplicarToggle(t);
-      t.addEventListener("change", () => { aplicarToggle(t); debouncedRefresh(); });
-    });
-
-    // primer render
-    refreshPreview();
-
-    // ---------- Comodines (snippets para LINEA_LIBRE) ----------
-    const taLibre = form.querySelector('textarea[name="campo_LINEA_LIBRE"]');
-    const selComodin = document.getElementById("comodinSelector");
-    const btnGuardarCmd = document.getElementById("btnGuardarComodin");
-    const btnEliminarCmd = document.getElementById("btnEliminarComodin");
-
-    if (taLibre && selComodin) {
-      let comodinesCache = [];
-
-      function pintarOpciones() {
-        selComodin.innerHTML = '<option value="">— Insertar comodín —</option>';
-        for (const c of comodinesCache) {
-          const opt = document.createElement("option");
-          opt.value = c.id;
-          opt.textContent = c.titulo;
-          selComodin.appendChild(opt);
-        }
-      }
-
-      async function cargar() {
-        try {
-          const res = await fetch("/comodines");
-          comodinesCache = await res.json();
-          pintarOpciones();
-        } catch (e) { /* silencio */ }
-      }
-
-      selComodin.addEventListener("change", () => {
-        const c = comodinesCache.find(x => x.id === selComodin.value);
-        if (c) {
-          // Si la línea libre estaba apagada, encenderla al insertar un comodín.
-          const tg = taLibre.closest(".field").querySelector(".opt-toggle");
-          if (tg && !tg.checked) { tg.checked = true; aplicarToggle(tg); }
-          taLibre.value = c.texto;
-          taLibre.dispatchEvent(new Event("input", { bubbles: true }));
-        }
-      });
-
-      btnGuardarCmd.addEventListener("click", async () => {
-        const texto = taLibre.value.trim();
-        if (!texto) { avisar("Escribe algo en la línea libre antes de guardarlo.", "error"); return; }
-        const titulo = await pedirTexto({ titulo: "Guardar comodín", placeholder: "Título del comodín", textoConfirmar: "Guardar" });
-        if (!titulo) return;
-        const fd = new FormData();
-        fd.append("titulo", titulo);
-        fd.append("texto", texto);
-        const res = await fetch("/comodines", { method: "POST", body: fd });
-        if (!res.ok) { avisar("No se pudo guardar.", "error"); return; }
-        const nuevo = await res.json();
-        comodinesCache.push(nuevo);
-        pintarOpciones();
-        selComodin.value = nuevo.id;
-      });
-
-      btnEliminarCmd.addEventListener("click", async () => {
-        const id = selComodin.value;
-        if (!id) { avisar("Selecciona un comodín a eliminar.", "error"); return; }
-        const c = comodinesCache.find(x => x.id === id);
-        const ok = await confirmar({
-          titulo: "¿Eliminar comodín?",
-          mensaje: `¿Eliminar el comodín "${c.titulo}"?`,
-          peligro: true,
-          textoConfirmar: "Eliminar",
-        });
-        if (!ok) return;
-        const res = await fetch(`/comodines/${id}`, { method: "DELETE" });
-        if (!res.ok) { avisar("No se pudo eliminar.", "error"); return; }
-        comodinesCache = comodinesCache.filter(x => x.id !== id);
-        pintarOpciones();
-      });
-
-      cargar();
-    }
-  </script>
-  <script>
-    window.TOUR = {
-      key: "generar",
-      steps: [
-        { sel: ".alumno-info", title: "Datos del alumno", text: "Resumen del alumno encontrado (plan, periodos, situación). Es solo de referencia." },
-        { sel: "#formCampos", title: "Campos del documento", text: "Vienen prellenados desde los datos y el catálogo de carreras. Edita cualquiera si necesitas corregirlo." },
-        { sel: ".radio-row", title: "Género", text: "Elige el género: el texto de la constancia (el/la alumno/a, del/de la interesada) se ajusta automáticamente." },
-        { sel: ".switch", title: "Líneas opcionales", text: "Cada línea opcional tiene este interruptor. Enciéndelo para incluirla o apágalo para omitirla, sin tener que borrar el texto." },
-        { sel: ".comodin-bar", title: "Comodines", text: "En la línea libre puedes guardar frases que usas seguido e insertarlas con un clic." },
-        { sel: "#pdfFrame", title: "Vista previa en vivo", text: "Se regenera con cada cambio que haces en el formulario, para que veas el resultado real." },
-        { sel: "#btnPdf", title: "Descargar", text: "Cuando esté listo, descarga la constancia en Word (.docx) o en PDF." }
-      ]
-    };
-  </script>
-  <script src="/static/tour.js?v=10"></script>
-</body>
-</html>
+{% block scripts %}
+<script>
+  window.GENERAR = {
+    cuenta: {{ alumno.Cuenta | tojson }},
+    nombre: {{ (alumno.NombreAlumno | nombre_legible) | tojson }},
+    plantilla: {{ plantilla_slug | tojson }},
+    plantillaNombre: {{ (plantilla_nombre or "Constancia") | tojson }},
+  };
+</script>
+<script src="/static/generar.js?v={{ V }}"></script>
+{% endblock %}

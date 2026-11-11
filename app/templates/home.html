@@ -1,264 +1,229 @@
-<!DOCTYPE html>
-<html lang="es">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Generador de Constancias</title>
-  <link rel="stylesheet" href="/static/styles.css?v=10">
-</head>
-<body>
-  <div class="page">
-    <header class="header">
-      <div class="brand">
-        <h1>Generador de Constancias</h1>
-        <p>Centro Universitario UAEM Tianguistenco</p>
-      </div>
-      <div class="appbar-actions">
-        <span class="chip {% if es_admin %}chip-primary{% endif %}">
-          {% if es_admin %}
-            <svg viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.5 3.8 10.7 9 12 5.2-1.3 9-6.5 9-12V5l-9-4z"/></svg>Administrador
-          {% else %}
-            <svg viewBox="0 0 24 24"><path d="M12 12a5 5 0 100-10 5 5 0 000 10zm0 2c-4.4 0-8 2.2-8 5v1h16v-1c0-2.8-3.6-5-8-5z"/></svg>Invitado
-          {% endif %}
-        </span>
-        <form action="/logout" method="post">
-          <button type="submit" class="btn-text">Cerrar sesión</button>
-        </form>
-        <button class="icon-btn" type="button" data-tour title="Ver tutorial" aria-label="Ver tutorial">
-          <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm0 16.5a1.25 1.25 0 110-2.5 1.25 1.25 0 010 2.5zm1.8-6.3c-.7.5-.9.8-.9 1.4v.4h-1.8v-.5c0-1.2.5-1.9 1.4-2.5.7-.5 1-.8 1-1.4 0-.7-.5-1.1-1.3-1.1-.8 0-1.3.4-1.7 1.1l-1.5-.9C9 7.9 10.1 7.2 11.6 7.2c1.9 0 3.2 1 3.2 2.7 0 1.1-.5 1.7-1.6 2.3z"/></svg>
-        </button>
-        <button id="themeToggle" class="icon-btn" type="button"></button>
-      </div>
-    </header>
+{% extends "base.html" %}
+{% from "_macros.html" import icono, ayuda, aviso %}
+{% set plantillas_listas = plantillas | selectattr("info") | list %}
+{% set puede_generar = datos and plantillas_listas %}
 
-    {% set plantillas_listas = plantillas | selectattr("info") | list %}
+{% block titulo %}Generar constancia{% endblock %}
+{% block subtitulo %}Busca al alumno, revisa sus datos con la vista previa y descarga el documento.{% endblock %}
+{% block recorrido %}home-{{ "admin" if es_admin else "invitado" }}-v2{% endblock %}
+{% block ancho %}page--ancha{% endblock %}
 
-    {% if request.query_params.get("error") == "alumno_no_encontrado" %}
-      <div class="note note-error">
-        <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
-        <span>No se encontró un alumno con la cuenta <strong>{{ request.query_params.get("cuenta") }}</strong>. También puedes buscar escribiendo el nombre.</span>
-      </div>
-    {% elif request.query_params.get("error") == "plantilla_no_encontrada" %}
-      <div class="note note-error">
-        <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
-        <span>La plantilla seleccionada ya no existe.</span>
-      </div>
-    {% endif %}
+{% block contenido %}
+  {% if request.query_params.get("error") == "alumno_no_encontrado" %}
+    {% call aviso("error") %}No hay ningún alumno con la cuenta <strong>{{ request.query_params.get("cuenta") }}</strong>. Revisa el número o busca escribiendo el nombre. Si es de nuevo ingreso, puede que aún no esté cargado (<a href="/ayuda/problemas-frecuentes#no-encuentra">¿qué hago?</a>).{% endcall %}
+  {% elif request.query_params.get("error") == "plantilla_no_encontrada" %}
+    {% call aviso("error") %}La plantilla seleccionada ya no existe. Elige otra.{% endcall %}
+  {% endif %}
 
-    {% if q_nombre %}
-      <div class="card entrada-escalonada" style="--i:0" id="resultados-busqueda" tabindex="-1">
-        <h2>
-          <svg viewBox="0 0 24 24"><path d="M10 2a8 8 0 105.3 14l5.4 5.4 1.4-1.4-5.4-5.4A8 8 0 0010 2zm0 2a6 6 0 110 12 6 6 0 010-12z"/></svg>
-          Resultados para «{{ q_nombre }}»
-        </h2>
-        {% if resultados %}
-          {% for r in resultados %}
-            <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 0; border-top:1px solid var(--outline-variant);">
-              <div>
-                <div style="font-weight:600;">{{ r.NombreAlumno }}</div>
-                <div style="font-size:13px; color:var(--on-surface-variant);">Cuenta {{ r.Cuenta }} · {{ r.Plan }}</div>
+  <div class="home-grid">
+    <div class="home-principal">
+
+      <section class="card card--hero entrada-escalonada" style="--i:0" aria-labelledby="tituloBuscar">
+        <ol class="flujo" aria-label="Pasos para generar una constancia"
+            {{ ayuda("Los 3 pasos", "Así se genera cualquier constancia: 1) buscas al alumno aquí, 2) revisas sus datos con la vista previa y 3) descargas en PDF o Word.", "generar-constancia") }}>
+          <li class="flujo-paso flujo-paso--actual"><span>1</span>Buscar alumno</li>
+          <li class="flujo-paso"><span>2</span>Revisar datos</li>
+          <li class="flujo-paso"><span>3</span>Descargar</li>
+        </ol>
+
+        <h2 id="tituloBuscar">{{ icono("buscar") }}¿Para quién es la constancia?</h2>
+
+        {% if not datos %}
+          <div class="vacio">
+            {{ icono("datos", "vacio-ico") }}
+            {% if es_admin %}
+              <p><strong>Todavía no hay alumnos cargados.</strong> Sube el padrón que entrega control escolar para empezar.</p>
+              <a class="btn" href="/datos">{{ icono("subir") }}Subir padrón de alumnos</a>
+              <a class="btn-text" href="/ayuda/cargar-padron">¿Qué archivo subo?</a>
+            {% else %}
+              <p><strong>Todavía no hay alumnos cargados.</strong> Pídele al administrador que suba el padrón de alumnos.</p>
+            {% endif %}
+          </div>
+        {% elif not plantillas_listas %}
+          <div class="vacio">
+            {{ icono("plantilla", "vacio-ico") }}
+            {% if es_admin %}
+              <p><strong>No hay ninguna plantilla de constancia.</strong> Sube una para poder generar.</p>
+              <a class="btn" href="/plantillas">{{ icono("subir") }}Ir a Plantillas</a>
+            {% else %}
+              <p><strong>No hay ninguna plantilla de constancia.</strong> Pídele al administrador que suba una.</p>
+            {% endif %}
+          </div>
+        {% else %}
+          <form id="formBuscar" action="/buscar" method="post" autocomplete="off">
+            <div class="field buscador" {{ ayuda("Buscador de alumnos", "Escribe el número de cuenta o parte del nombre (sin importar acentos ni mayúsculas). Mientras escribes aparecen sugerencias: elige una con el ratón o con las flechas y Enter.", "generar-constancia#buscar", paso=1) }}>
+              <label for="cuenta">Número de cuenta o nombre del alumno</label>
+              <div class="combo">
+                {{ icono("buscar", "combo-ico") }}
+                <input id="cuenta" type="text" name="cuenta" required autofocus
+                       role="combobox" aria-autocomplete="list" aria-expanded="false"
+                       aria-controls="sugerencias" aria-describedby="cuentaAyuda"
+                       placeholder="Ej. 2014694 o «pérez juan»" value="{{ q_nombre }}">
+                <kbd class="combo-atajo" title="Pulsa / desde cualquier parte para escribir aquí">/</kbd>
               </div>
-              <a class="btn btn-tonal" href="/generar?cuenta={{ r.Cuenta }}&plantilla={{ request.query_params.get('plantilla', '') }}">Generar</a>
+              <ul id="sugerencias" class="sugerencias" role="listbox" aria-label="Alumnos encontrados" hidden></ul>
+              <p class="hint" id="cuentaAyuda">Aparecen sugerencias desde 2 letras o números.</p>
             </div>
+
+            {% if plantillas_listas | length > 1 %}
+            <fieldset class="field opciones-plantilla" {{ ayuda("Tipo de constancia", "Elige qué documento quieres generar. Cada tipo es una plantilla de Word distinta (general, en inglés, prácticas…). Puedes cambiarlo después sin volver a buscar.", "generar-constancia#tipo", paso=2) }}>
+              <legend>Tipo de constancia</legend>
+              <div class="opciones">
+                {% set elegida = request.query_params.get('plantilla') or plantillas_listas[0].slug %}
+                {% for it in plantillas_listas %}
+                <label class="opcion">
+                  <input type="radio" name="plantilla" value="{{ it.slug }}" {% if it.slug == elegida %}checked{% endif %}>
+                  <span class="opcion-cuerpo">{{ icono("plantilla") }}<span>{{ it.nombre }}</span></span>
+                </label>
+                {% endfor %}
+              </div>
+            </fieldset>
+            {% else %}
+              <input type="hidden" name="plantilla" value="{{ plantillas_listas[0].slug }}">
+            {% endif %}
+
+            <div class="actions">
+              <button type="submit">{{ icono("adelante") }}Continuar</button>
+            </div>
+          </form>
+        {% endif %}
+      </section>
+
+      {% if q_nombre %}
+      <section class="card entrada-escalonada" style="--i:1" id="resultados-busqueda" tabindex="-1" aria-labelledby="tituloResultados">
+        <h2 id="tituloResultados">{{ icono("lista") }}Resultados para «{{ q_nombre }}»</h2>
+        {% if resultados %}
+          <ul class="lista-alumnos">
+          {% for r in resultados %}
+            <li>
+              <div>
+                <div class="lista-nombre">{{ r.NombreAlumno }}</div>
+                <div class="lista-meta">Cuenta {{ r.Cuenta }} · {{ r.Plan }}{% if r._origen == "nuevo_ingreso" %} · <span class="field-tag">nuevo ingreso</span>{% endif %}</div>
+              </div>
+              <a class="btn btn-tonal" href="/generar?cuenta={{ r.Cuenta }}&plantilla={{ request.query_params.get('plantilla', '') }}">Elegir</a>
+            </li>
           {% endfor %}
+          </ul>
           {% if resultados|length >= 20 %}
-            <p style="font-size:13px; color:var(--on-surface-variant); margin-top:10px;">Se muestran los primeros 20. Escribe más palabras del nombre para afinar.</p>
+            <p class="muted">Se muestran los primeros 20. Escribe más palabras del nombre para afinar.</p>
           {% endif %}
         {% else %}
-          <p>Ningún alumno coincide con ese nombre. Revisa la ortografía (los acentos no importan).</p>
+          <p>Ningún alumno coincide con ese nombre. Revisa la ortografía (los acentos no importan) o prueba solo con un apellido.</p>
         {% endif %}
-      </div>
-    {% endif %}
+      </section>
+      {% endif %}
 
-    {% if es_admin %}
-    <div class="grid">
-      <div class="card entrada-escalonada" style="--i:1">
-        <h2>
-          <svg viewBox="0 0 24 24"><path d="M7 2a1 1 0 011 1v1h8V3a1 1 0 112 0v1h1a2 2 0 012 2v13a2 2 0 01-2 2H5a2 2 0 01-2-2V6a2 2 0 012-2h1V3a1 1 0 011-1zm12 7H5v10h14V9z"/></svg>
-          Periodo activo
-        </h2>
-        {% if request.query_params.get("error_ajustes") %}
-          <div class="note note-error" style="margin-bottom: 12px;">
-            <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z"/></svg>
-            <span>{{ request.query_params.get("error_ajustes") }}</span>
-          </div>
-        {% endif %}
-        <p>Se configura <strong>una vez por semestre</strong>. El periodo (ej. <code>2026A</code>) se usa para calcular el semestre del alumno; las fechas prellenan «Inicio/Fin del periodo» en todas las constancias.</p>
-        <form action="/ajustes" method="post">
-          <div class="field">
-            <label for="periodo_actual">Periodo</label>
-            <input id="periodo_actual" type="text" name="periodo_actual" maxlength="6"
-                   value="{{ ajustes.get('periodo_actual', '') }}"
-                   placeholder="2026A" pattern="[0-9]{4}[ABab]" required>
-          </div>
-          <div class="field" style="display:flex; gap:10px;">
-            <div style="flex:1;">
-              <label for="periodo_inicio">Inicio del periodo</label>
-              <input id="periodo_inicio" type="date" name="periodo_inicio"
-                     value="{{ ajustes.get('periodo_fecha_inicio', '') }}">
-            </div>
-            <div style="flex:1;">
-              <label for="periodo_fin">Fin del periodo</label>
-              <input id="periodo_fin" type="date" name="periodo_fin"
-                     value="{{ ajustes.get('periodo_fecha_fin', '') }}">
-            </div>
-          </div>
-          <p style="font-size:12px; color:var(--on-surface-variant); margin:-4px 0 12px;">Si las dejas vacías se usan las fechas típicas (02 de febrero / 02 de agosto). Siempre puedes ajustarlas en una constancia concreta.</p>
-          <div class="actions">
-            <button type="submit">Guardar periodo</button>
-          </div>
-        </form>
-      </div>
-
-      <div class="card {% if not datos %}card--protagonista{% endif %} entrada-escalonada" style="--i:2" id="tour-datos">
-        <h2>
-          <svg viewBox="0 0 24 24"><path d="M4 4a2 2 0 012-2h8l6 6v12a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm9 1v5h5l-5-5z"/></svg>
-          Datos cargados
-        </h2>
-        {% if datos %}
-          <p><strong>{{ datos.filename }}</strong><br>{{ datos.filas }} alumnos · cargado {{ datos.fecha_carga }}</p>
-        {% else %}
-          <p>No hay datos cargados todavía.</p>
-        {% endif %}
-        {% if ni %}
-          <p><strong>{{ ni.filename }}</strong> <span class="field-tag">nuevo ingreso</span><br>{{ ni.filas }} alumnos · periodo {{ ni.periodo }} · cargado {{ ni.fecha_carga }}</p>
-        {% endif %}
-        <div class="actions">
-          <a class="btn btn-tonal" href="/datos">Gestionar datos</a>
+      {% if puede_generar %}
+      <section class="card entrada-escalonada" style="--i:2" id="recientes" hidden aria-labelledby="tituloRecientes"
+               {{ ayuda("Constancias recientes", "Las últimas constancias descargadas en este equipo, para volver a generarlas con un clic (por ejemplo, si te piden otra copia). Solo se guardan en este navegador.", "generar-constancia#recientes", paso=3) }}>
+        <div class="card-cab">
+          <h2 id="tituloRecientes">{{ icono("reloj") }}Recientes en este equipo</h2>
+          <button type="button" class="btn-text" id="btnBorrarRecientes">Borrar lista</button>
         </div>
-      </div>
-    </div>
-    {% else %}
-    <div class="card entrada-escalonada" style="--i:1">
-      <h2>
-        <svg viewBox="0 0 24 24"><path d="M12 2a10 10 0 100 20 10 10 0 000-20zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
-        Estado del sistema
-      </h2>
-      <p style="margin: 0;">
-        Periodo activo <strong>{{ ajustes.get('periodo_actual', '—') }}</strong>
-        {% if datos %} · {{ datos.filas }} alumnos cargados{% endif %}
-        {% if ni %} · {{ ni.filas }} de nuevo ingreso{% endif %}
-      </p>
-    </div>
-    {% endif %}
-
-    <div class="card {% if datos and plantillas_listas %}card--protagonista{% endif %} entrada-escalonada" style="--i:3" id="tour-generar">
-      <h2>
-        <svg viewBox="0 0 24 24"><path d="M10 2a8 8 0 105.3 14l5.4 5.4 1.4-1.4-5.4-5.4A8 8 0 0010 2zm0 2a6 6 0 110 12 6 6 0 010-12z"/></svg>
-        Generar constancia
-      </h2>
-      {% if not datos %}
-        <p>{% if es_admin %}Sube primero un archivo de datos.{% else %}No hay datos cargados. Pídele al administrador que los suba.{% endif %}</p>
-      {% elif not plantillas_listas %}
-        <p>{% if es_admin %}No hay plantilla cargada. <a href="/plantillas">Sube una</a> antes de generar.{% else %}No hay plantilla cargada. Pídele al administrador que la suba.{% endif %}</p>
-      {% else %}
-        <form action="/buscar" method="post">
-          <div class="field">
-            <label for="cuenta">Número de cuenta o nombre <span class="hint">— pulsa <kbd>/</kbd> para saltar aquí</span></label>
-            <input id="cuenta" type="text" name="cuenta" placeholder="Ej. 2014694 o «perez juan»" required autofocus
-                   value="{{ q_nombre }}">
-          </div>
-          {% if plantillas_listas|length > 1 %}
-          <div class="field">
-            <label for="selPlantilla">Tipo de constancia</label>
-            <select id="selPlantilla" name="plantilla">
-              {% for it in plantillas_listas %}
-                <option value="{{ it.slug }}" {% if request.query_params.get('plantilla') == it.slug %}selected{% endif %}>{{ it.nombre }}</option>
-              {% endfor %}
-            </select>
-          </div>
-          {% else %}
-            <input type="hidden" name="plantilla" value="{{ plantillas_listas[0].slug }}">
-          {% endif %}
-          <div class="actions">
-            <button type="submit">
-              <svg viewBox="0 0 24 24"><path d="M10 2a8 8 0 105.3 14l5.4 5.4 1.4-1.4-5.4-5.4A8 8 0 0010 2zm0 2a6 6 0 110 12 6 6 0 010-12z"/></svg>
-              Buscar y continuar
-            </button>
-          </div>
-        </form>
+        <ul class="lista-alumnos" id="listaRecientes"></ul>
+      </section>
       {% endif %}
     </div>
 
-    {% if es_admin %}
-    <div class="grid">
-      <div class="card entrada-escalonada" style="--i:4" id="tour-plantilla">
-        <h2>
-          <svg viewBox="0 0 24 24"><path d="M4 4a2 2 0 012-2h8l6 6v12a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm9 1v5h5l-5-5z"/></svg>
-          Plantillas
-        </h2>
-        {% if plantillas_listas %}
-          <p>{{ plantillas_listas|length }} plantilla{{ "s" if plantillas_listas|length != 1 }} activa{{ "s" if plantillas_listas|length != 1 }}:
-            {% for it in plantillas_listas %}<strong>{{ it.nombre }}</strong>{% if not loop.last %} · {% endif %}{% endfor %}
-          </p>
-        {% else %}
-          <p>No hay plantilla cargada todavía.</p>
+    <aside class="home-lateral">
+      {% if es_admin %}
+      <section class="card entrada-escalonada {% if not preparacion.listo %}card--atencion{% endif %}" style="--i:1" aria-labelledby="tituloPrep"
+               {{ ayuda("Preparación del semestre", "Lista de lo que debe estar listo para que las constancias salgan prellenadas. Se revisa sola: si algo falta o tiene un problema (por ejemplo, una carrera del padrón sin dar de alta), aparece aquí con el botón para arreglarlo.", "inicio-de-semestre", paso=4) }}>
+        <div class="card-cab">
+          <h2 id="tituloPrep">{{ icono("check-circulo") }}Preparación del semestre</h2>
+          <span class="progreso-chip">{{ preparacion.hechos }} de {{ preparacion.total }}</span>
+        </div>
+        <div class="progreso" role="progressbar" aria-label="Preparación del semestre"
+             aria-valuemin="0" aria-valuemax="{{ preparacion.total }}" aria-valuenow="{{ preparacion.hechos }}">
+          <span style="width: {{ (preparacion.hechos / preparacion.total * 100) | round }}%"></span>
+        </div>
+        {% if preparacion.listo %}
+          <p class="muted">Todo listo. Revísalo de nuevo cuando empiece el próximo semestre.</p>
         {% endif %}
-        <div class="actions">
-          <a class="btn btn-tonal" href="/plantillas">Gestionar plantillas</a>
-        </div>
-      </div>
+        <ol class="checklist">
+          {% for p in preparacion.pasos %}
+          <li class="check-item {% if p.ok and not p.parcial %}check-item--ok{% elif p.parcial %}check-item--parcial{% else %}check-item--pendiente{% endif %}">
+            <span class="check-marca" aria-hidden="true">{% if p.ok and not p.parcial %}{{ icono("check") }}{% elif p.parcial %}!{% else %}{{ loop.index }}{% endif %}</span>
+            <div class="check-texto">
+              <strong>{{ p.titulo }}</strong>
+              <span class="sr-only">{% if p.ok and not p.parcial %}(completo){% elif p.parcial %}(revisar){% else %}(pendiente){% endif %}</span>
+              <span>{{ p.detalle }}</span>
+            </div>
+            {% if not p.ok or p.parcial or p.clave != "periodo" %}
+            <a class="btn-text check-accion" href="{{ p.url }}">{{ p.accion }}</a>
+            {% endif %}
+          </li>
+          {% endfor %}
+        </ol>
+        <a class="btn-text" href="/ayuda/inicio-de-semestre">{{ icono("libro") }}Ver la guía de inicio de semestre</a>
+      </section>
 
-      <div class="card entrada-escalonada" style="--i:5" id="tour-carreras">
-        <h2>
-          <svg viewBox="0 0 24 24"><path d="M12 3L1 9l11 6 9-4.9V17h2V9L12 3zm-7 9.6V17c0 1.7 3.1 3 7 3s7-1.3 7-3v-4.4l-7 3.8-7-3.8z"/></svg>
-          Carreras
-        </h2>
-        <p>Catálogo de carreras y duración de planes. Aquí das de alta una carrera nueva sin tocar código.</p>
-        <div class="actions">
-          <a class="btn btn-tonal" href="/carreras">Gestionar carreras</a>
-        </div>
-      </div>
-    </div>
-    {% endif %}
+      <section class="card entrada-escalonada" style="--i:2" id="periodo" aria-labelledby="tituloPeriodo"
+               {{ ayuda("Periodo activo", "Se configura una vez por semestre. El periodo (ej. 2026A) sirve para calcular en qué semestre va cada alumno; las fechas prellenan «Inicio/Fin del periodo» en todas las constancias.", "inicio-de-semestre#periodo", paso=5) }}>
+        <h2 id="tituloPeriodo">{{ icono("calendario") }}Periodo activo</h2>
+        {% if request.query_params.get("error_ajustes") %}
+          {% call aviso("error") %}{{ request.query_params.get("error_ajustes") }}{% endcall %}
+        {% endif %}
+        <form action="/ajustes" method="post">
+          <div class="field">
+            <label for="periodo_actual">Periodo en curso</label>
+            <input id="periodo_actual" type="text" name="periodo_actual" maxlength="5"
+                   value="{{ ajustes.get('periodo_actual', '') }}" aria-describedby="periodoAyuda"
+                   placeholder="2026A" pattern="[0-9]{4}[ABab]" required
+                   title="Cuatro dígitos del año y la letra A (febrero–julio) o B (agosto–enero). Ej. 2026A">
+            <p class="hint" id="periodoAyuda">Año + <strong>A</strong> (feb–jul) o <strong>B</strong> (ago–ene). Ej. <code>2026A</code></p>
+          </div>
+          <div class="field fila-2">
+            <div>
+              <label for="periodo_inicio">Inicio del semestre</label>
+              <input id="periodo_inicio" type="date" name="periodo_inicio" value="{{ ajustes.get('periodo_fecha_inicio', '') }}">
+            </div>
+            <div>
+              <label for="periodo_fin">Fin del semestre</label>
+              <input id="periodo_fin" type="date" name="periodo_fin" value="{{ ajustes.get('periodo_fecha_fin', '') }}">
+            </div>
+          </div>
+          <p class="hint">Usa las fechas del calendario escolar oficial. Si las dejas vacías se usan las típicas (02 de febrero / 02 de agosto).</p>
+          <div class="actions">
+            <button type="submit">{{ icono("check") }}Guardar periodo</button>
+          </div>
+        </form>
+      </section>
+      {% else %}
+      <section class="card entrada-escalonada" style="--i:1" aria-labelledby="tituloEstado"
+               {{ ayuda("Estado del sistema", "Qué está cargado ahora mismo. Si el periodo aparece vacío, el semestre del alumno no se calcula solo: avísale al administrador.", "problemas-frecuentes#semestre-vacio", paso=4) }}>
+        <h2 id="tituloEstado">{{ icono("info") }}Estado del sistema</h2>
+        <dl class="datos-lista">
+          <div><dt>Periodo activo</dt><dd>{{ ajustes.get('periodo_actual') or "Sin configurar" }}</dd></div>
+          <div><dt>Alumnos cargados</dt><dd>{{ datos.filas if datos else 0 }}{% if ni %} + {{ ni.filas }} de nuevo ingreso{% endif %}</dd></div>
+          <div><dt>Tipos de constancia</dt><dd>{{ plantillas_listas | length }}</dd></div>
+        </dl>
+        {% if not ajustes.get('periodo_actual') %}
+          {% call aviso("alerta") %}Sin periodo activo el semestre sale vacío. Avísale al administrador.{% endcall %}
+        {% endif %}
+      </section>
+      {% endif %}
+
+      <section class="card card--suave entrada-escalonada" style="--i:3" aria-labelledby="tituloGuias">
+        <h2 id="tituloGuias">{{ icono("libro") }}¿Necesitas ayuda?</h2>
+        <ul class="enlaces-guias">
+          <li><a href="/ayuda/generar-constancia">Generar una constancia paso a paso</a></li>
+          {% if es_admin %}
+          <li><a href="/ayuda/crear-plantilla">Crear un nuevo tipo de constancia</a></li>
+          <li><a href="/ayuda/inicio-de-semestre">Qué revisar al iniciar el semestre</a></li>
+          {% endif %}
+          <li><a href="/ayuda/problemas-frecuentes">Problemas frecuentes</a></li>
+        </ul>
+        <button type="button" class="btn-tonal" onclick="window.iniciarRecorrido && window.iniciarRecorrido()">{{ icono("recorrido") }}Repetir el recorrido de esta pantalla</button>
+      </section>
+    </aside>
   </div>
-  <script src="/static/theme.js?v=10"></script>
-  <script src="/static/ui.js?v=10"></script>
-  <script>
-    // Al llegar resultados de una búsqueda por nombre, enfoca esa tarjeta.
-    (function () {
-      var resultados = document.getElementById("resultados-busqueda");
-      if (resultados) {
-        var sinMovimiento = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-        resultados.scrollIntoView({ behavior: sinMovimiento ? "auto" : "smooth", block: "start" });
-        resultados.focus({ preventScroll: true });
-      }
-    })();
-  </script>
-  <script>
-    // Atajo "/" para saltar al buscador, salvo si ya se está escribiendo en un campo.
-    (function () {
-      var cuenta = document.getElementById("cuenta");
-      if (!cuenta) return;
-      document.addEventListener("keydown", function (e) {
-        if (e.key !== "/") return;
-        var el = document.activeElement;
-        var enCampo = el && (
-          el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.tagName === "SELECT" || el.isContentEditable
-        );
-        if (enCampo) return;
-        e.preventDefault();
-        cuenta.focus();
-        cuenta.select();
-      });
-    })();
-  </script>
-  <script>
-    window.TOUR = {
-      key: "home-{% if es_admin %}admin{% else %}invitado{% endif %}",
-      steps: [
-        { sel: ".chip", title: "Tu sesión", text: "Aquí ves con qué rol entraste: Administrador (puede subir datos y plantillas) o Invitado (solo genera)." },
-        { sel: "#cuenta", title: "Generar una constancia", text: "Escribe el número de cuenta o parte del nombre del alumno y pulsa «Buscar y continuar»." },
-        { sel: "#selPlantilla", title: "Tipo de constancia", text: "Si hay varias plantillas (general, inglés, prácticas…), elige aquí cuál usar." },
-        { sel: "#periodo_actual", title: "Periodo activo", text: "Define el periodo en curso (ej. 2026A) una vez por semestre. Con él se calcula automáticamente el semestre del alumno (comparándolo con su periodo de ingreso)." },
-        { sel: "#periodo_inicio", title: "Fechas del periodo", text: "Guarda aquí las fechas reales de inicio y fin del semestre según el calendario escolar: todas las constancias saldrán prellenadas con ellas." },
-        { sel: "#tour-datos", title: "Datos de alumnos", text: "Consulta y reemplaza aquí la base de datos (.xls, .xlsx o .csv). El archivo se conserva hasta que subas otro." },
-        { sel: "#tour-plantilla", title: "Plantillas", text: "Gestiona los documentos .docx con placeholders [[CAMPO]]. Puedes tener varias: constancia general, en inglés, de prácticas…" },
-        { sel: "#tour-carreras", title: "Carreras", text: "Cuando abran una carrera nueva o cambie la duración de un plan, dala de alta aquí. Sin programador." },
-        { sel: "[data-tour]", title: "¿Repasar el tutorial?", text: "Cuando quieras volver a ver esta guía, pulsa este botón de ayuda." }
-      ]
-    };
-  </script>
-  <script src="/static/tour.js?v=10"></script>
-</body>
-</html>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  window.PLANTILLAS = {{ plantillas_listas | map(attribute="nombre") | list | tojson }};
+  window.PLANTILLAS_SLUGS = {{ plantillas_listas | map(attribute="slug") | list | tojson }};
+</script>
+<script src="/static/buscador.js?v={{ V }}"></script>
+{% endblock %}

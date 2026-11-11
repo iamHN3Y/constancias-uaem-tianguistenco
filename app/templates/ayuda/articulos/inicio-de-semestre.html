@@ -1,0 +1,24 @@
+{% from "_macros.html" import icono %}
+<p>Al empezar cada semestre, el administrador deja el sistema listo para que todas las constancias salgan prellenadas. La pantalla de <a href="/">Inicio</a> tiene una tarjeta <strong>Preparación del semestre</strong> que revisa todo esto sola y marca lo que falta.</p>
+
+<h2 id="periodo">1. Configurar el periodo activo</h2>
+<ol class="pasos">
+  <li>En Inicio, tarjeta <strong>Periodo activo</strong>, escribe el periodo en curso: el año y la letra <strong>A</strong> (febrero–julio) o <strong>B</strong> (agosto–enero). Ejemplo: <code>2026A</code>.</li>
+  <li>Elige las fechas reales de <strong>inicio y fin del semestre</strong> según el calendario escolar oficial.</li>
+  <li>Pulsa <strong>Guardar periodo</strong>.</li>
+</ol>
+<p><strong>¿Para qué sirve?</strong> Con el periodo, el sistema calcula en qué semestre va cada alumno comparándolo con su periodo de ingreso (ingresó en 2023B y estamos en 2026A → «sexto»). Las fechas prellenan «Inicio/Fin del periodo» en todas las constancias. Si no las configuras, se usan las típicas (02 de febrero / 02 de agosto).</p>
+<div class="consejo consejo--atencion">{{ icono("alerta") }}<p>Si olvidas actualizar el periodo, <strong>todos los semestres saldrán atrasados</strong>. Es lo primero que hay que hacer cada semestre.</p></div>
+
+<h2 id="padron">2. Subir el padrón actualizado</h2>
+<p>Pide a control escolar el padrón del semestre y súbelo en <a href="/datos">Datos</a>. Reemplaza al anterior por completo. <a href="/ayuda/cargar-padron">Guía detallada</a>.</p>
+<p>Si hay alumnos que aún no aparecen en ese padrón (por ejemplo, de nuevo ingreso), súbelos aparte. <a href="/ayuda/nuevo-ingreso">Ver cómo</a>.</p>
+
+<h2 id="plantillas">3. Revisar las plantillas</h2>
+<p>En <a href="/plantillas">Plantillas</a>, revisa que no haya avisos de campos mal escritos y que los textos fijos sigan vigentes: <strong>nombre de quien firma</strong>, <strong>lema del año</strong> («2026, Conmemoración de…»), teléfonos y correos. El lema cambia cada año. <a href="/ayuda/modificar-y-restaurar-plantillas">Cómo modificar una plantilla</a>.</p>
+
+<h2 id="carreras">4. Revisar las carreras</h2>
+<p>Si en el padrón aparece un plan cuyo código no está en el catálogo, la constancia mostraría el código en lugar del nombre de la carrera. El sistema los detecta solo: aparecen en la lista de preparación y al inicio de <a href="/carreras">Carreras</a>, con un botón «Dar de alta». <a href="/ayuda/carreras">Guía de carreras</a>.</p>
+
+<h2 id="prueba">5. Hacer una constancia de prueba</h2>
+<p>Genera una constancia de cualquier alumno y revisa la vista previa con calma: semestre correcto, fechas del periodo, carrera completa, firma y lema actualizados. Si todo está bien, el semestre está listo.</p>

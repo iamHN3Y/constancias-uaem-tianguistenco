@@ -278,9 +278,91 @@
     });
   }
 
+  /**
+   * recientes — últimas constancias descargadas EN ESTE NAVEGADOR, para
+   * regenerarlas con un clic. Solo localStorage: no se comparte entre
+   * equipos ni llega al servidor. Si el almacenamiento falla (modo
+   * privado, bloqueado), simplemente no hay lista.
+   */
+  const RECIENTES_KEY = "constancias_recientes";
+  const RECIENTES_MAX = 6;
+  const recientes = {
+    listar() {
+      try {
+        const lista = JSON.parse(localStorage.getItem(RECIENTES_KEY) || "[]");
+        return Array.isArray(lista) ? lista : [];
+      } catch (e) { return []; }
+    },
+    agregar(item) {
+      try {
+        const ahora = new Date();
+        item.cuando = ahora.toLocaleDateString("es-MX", { day: "numeric", month: "short" }) +
+          ", " + ahora.toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" });
+        const lista = recientes.listar().filter(
+          (r) => !(r.cuenta === item.cuenta && r.plantilla === item.plantilla)
+        );
+        lista.unshift(item);
+        localStorage.setItem(RECIENTES_KEY, JSON.stringify(lista.slice(0, RECIENTES_MAX)));
+      } catch (e) { /* sin almacenamiento: no pasa nada */ }
+    },
+    borrar() {
+      try { localStorage.removeItem(RECIENTES_KEY); } catch (e) { /* idem */ }
+    },
+  };
+
+  /**
+   * Zonas para soltar archivos: cualquier <label class="dropzone"> que
+   * contenga un input[type=file] muestra el nombre y tamaño del archivo
+   * elegido y acepta arrastrar y soltar. El input real sigue dentro (los
+   * formularios funcionan igual sin JS).
+   */
+  function tamanoLegible(bytes) {
+    if (bytes < 1024) return bytes + " B";
+    if (bytes < 1024 * 1024) return Math.round(bytes / 1024) + " KB";
+    return (bytes / 1024 / 1024).toFixed(1) + " MB";
+  }
+
+  function prepararDropzones() {
+    document.querySelectorAll("label.dropzone").forEach((zona) => {
+      const input = zona.querySelector('input[type="file"]');
+      const estado = zona.querySelector(".dropzone-archivo");
+      if (!input || zona.dataset.listo) return;
+      zona.dataset.listo = "1";
+      const aceptadas = (input.getAttribute("accept") || "").split(",").map((x) => x.trim().toLowerCase()).filter(Boolean);
+
+      function mostrar() {
+        const f = input.files && input.files[0];
+        zona.classList.toggle("dropzone--lleno", !!f);
+        if (!estado) return;
+        estado.textContent = f ? "Elegido: " + f.name + " (" + tamanoLegible(f.size) + ")" : "";
+        if (f && aceptadas.length && !aceptadas.some((ext) => f.name.toLowerCase().endsWith(ext))) {
+          estado.textContent = "«" + f.name + "» no es un formato aceptado (" + aceptadas.join(", ") + ").";
+          zona.classList.add("dropzone--error");
+        } else {
+          zona.classList.remove("dropzone--error");
+        }
+      }
+      input.addEventListener("change", mostrar);
+      ["dragenter", "dragover"].forEach((ev) => zona.addEventListener(ev, (e) => {
+        e.preventDefault();
+        zona.classList.add("dropzone--encima");
+      }));
+      ["dragleave", "drop"].forEach((ev) => zona.addEventListener(ev, () => zona.classList.remove("dropzone--encima")));
+      zona.addEventListener("drop", (e) => {
+        e.preventDefault();
+        if (e.dataTransfer && e.dataTransfer.files.length) {
+          input.files = e.dataTransfer.files;
+          mostrar();
+        }
+      });
+      mostrar();
+    });
+  }
+
   function bootstrap() {
     regionSnackbar();
     autoProteger();
+    prepararDropzones();
   }
 
   if (document.readyState === "loading") {
@@ -293,4 +375,5 @@
   window.confirmar = confirmar;
   window.pedirTexto = pedirTexto;
   window.protegerFormulario = protegerFormulario;
+  window.recientes = recientes;
 })();

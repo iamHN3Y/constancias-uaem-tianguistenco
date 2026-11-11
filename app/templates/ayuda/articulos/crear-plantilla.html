@@ -1,0 +1,83 @@
+{% from "_macros.html" import icono %}
+<p>Una <strong>plantilla</strong> es un documento de Word normal (con su membrete, logos, firma y formato) donde los datos que cambian de alumno a alumno se escriben como <strong>campos entre corchetes dobles</strong>, por ejemplo <code>[[NOMBRE_COMPLETO]]</code>. Al generar, el sistema reemplaza cada campo por el dato real. No se necesita saber programar.</p>
+
+<div class="word-mock" aria-label="Ejemplo de plantilla en Word">
+  <p class="word-mock-titulo">A QUIEN CORRESPONDA:</p>
+  <p>Se hace constar que <span class="ph-demo">[[ARTICULO]]</span> <strong><span class="ph-demo">[[NOMBRE_COMPLETO]]</span></strong> con número de cuenta <span class="ph-demo">[[CUENTA]]</span>, cursa actualmente el <span class="ph-demo">[[SEMESTRE_TEXTO]]</span> semestre de la <span class="ph-demo">[[CARRERA_FULL]]</span>, en el periodo del <span class="ph-demo">[[PERIODO_INICIO]]</span> al <span class="ph-demo">[[PERIODO_FIN]]</span>.</p>
+  <p><span class="ph-demo">[[PROMEDIO_GENERAL_LINEA]]</span></p>
+  <p>Se extiende la presente <span class="ph-demo">[[FECHA_EXPEDICION]]</span>.</p>
+</div>
+<p class="pie-figura">Así se ve una plantilla en Word. Lo resaltado son campos; todo lo demás se imprime tal cual.</p>
+
+<h2 id="base">Paso 1. Consigue un documento base</h2>
+<p>Lo más fácil es partir de una plantilla que ya funciona, para conservar el membrete, los logos y los márgenes:</p>
+<ul>
+  <li><a href="/ayuda/plantilla-ejemplo.docx">{{ icono("descargar") }}Descarga la plantilla de ejemplo</a> (la constancia original del sistema), o</li>
+  <li>en <a href="/plantillas">Plantillas</a>, pulsa <strong>Descargar para editar</strong> en cualquiera de las existentes.</li>
+</ul>
+<p>También puedes empezar desde un documento de Word en blanco o desde una constancia que ya usaban a mano.</p>
+
+<h2 id="redactar">Paso 2. Redacta el texto fijo en Word</h2>
+<p>Escribe y da formato a todo lo que no cambia: título, redacción, firma, lema del año, pie de página. Usa Word como siempre: negritas, tablas, encabezados, imágenes, todo se respeta.</p>
+
+<h2 id="campos">Paso 3. Coloca los campos</h2>
+<p>Donde deba ir un dato del alumno, escribe su campo. La <a href="/ayuda/campos-de-plantilla">lista completa de campos</a> dice qué hace cada uno y cómo se imprime. Los más usados:</p>
+<table class="tabla">
+  <thead><tr><th scope="col">Escribe en Word</th><th scope="col">Se imprime como</th></tr></thead>
+  <tbody>
+    {% for f in campos[:6] %}
+    <tr><td><code>[[{{ f.nombre }}]]</code></td><td>{{ f.ejemplo }}</td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<h3 id="reglas">Reglas para escribir campos</h3>
+<ul>
+  <li><strong>Dos corchetes de cada lado:</strong> <code>[[CUENTA]]</code>. Con uno solo (<code>[CUENTA]</code>) no se reconoce.</li>
+  <li><strong>Sin espacios dentro del nombre:</strong> usa guion bajo. <code>[[FECHA_EXAMEN]]</code> sí; <code>[[FECHA EXAMEN]]</code> no.</li>
+  <li>Mayúsculas o minúsculas da igual (se convierten solas). Se permiten acentos y Ñ.</li>
+  <li>El <strong>formato del campo se respeta</strong>: si pones <code>[[NOMBRE_COMPLETO]]</code> en negritas, el nombre sale en negritas.</li>
+  <li>Funcionan en el cuerpo, en <strong>tablas</strong>, en <strong>encabezados y pies de página</strong> y en <strong>cuadros de texto</strong>.</li>
+  <li>Puedes usar el mismo campo varias veces.</li>
+</ul>
+
+<h3 id="propios">Inventar tus propios campos</h3>
+<p>Si necesitas un dato que no está en la lista, invéntalo: el sistema lo detecta solo y lo agrega al formulario. Su <strong>terminación</strong> decide cómo se comporta:</p>
+<table class="tabla">
+  <thead><tr><th scope="col">Si el nombre…</th><th scope="col">Ejemplo</th><th scope="col">En el formulario aparece</th></tr></thead>
+  <tbody>
+    <tr><td>termina en <code>_FECHA</code></td><td><code>[[EXAMEN_FECHA]]</code></td><td>Un calendario; se imprime «02 de febrero de 2026»</td></tr>
+    <tr><td>termina en <code>_LINEA</code></td><td><code>[[BECA_LINEA]]</code></td><td>Un texto con interruptor: si se apaga o queda vacío, <strong>el párrafo completo desaparece</strong></td></tr>
+    <tr><td>cualquier otro nombre</td><td><code>[[MATERIA]]</code></td><td>Una casilla de texto libre</td></tr>
+  </tbody>
+</table>
+<div class="consejo consejo--atencion">{{ icono("alerta") }}<p>Un campo <code>_LINEA</code> debe ir <strong>solo en su propio párrafo</strong>: cuando se omite se borra el párrafo entero, incluido cualquier texto que tenga al lado.</p></div>
+
+<h2 id="guardar">Paso 4. Guarda como .docx</h2>
+<p>En Word: <strong>Archivo → Guardar como → Documento de Word (.docx)</strong>. No uses .doc (formato antiguo) ni PDF: el sistema solo acepta .docx.</p>
+
+<h2 id="subir">Paso 5. Súbela al sistema</h2>
+<ol class="pasos">
+  <li>Ve a <a href="/plantillas">Plantillas</a> y baja hasta <strong>Nueva plantilla</strong> (o usa el botón «Nueva plantilla» de arriba).</li>
+  <li>Escribe el <strong>nombre del tipo de constancia</strong> tal como quieres que lo vean todos, por ejemplo «Constancia en inglés».</li>
+  <li>Elige el archivo .docx (o arrástralo) y pulsa <strong>Crear plantilla</strong>.</li>
+</ol>
+<p>Si en lugar de crear un tipo nuevo quieres <strong>corregir uno existente</strong>, usa «Subir versión corregida» en su tarjeta. <a href="/ayuda/modificar-y-restaurar-plantillas">Ver cómo</a>.</p>
+
+<h2 id="probar">Paso 6. Revisa y prueba</h2>
+<ol class="pasos">
+  <li>En la tarjeta de la plantilla aparecen los <strong>campos detectados</strong>. Los conocidos se muestran con su nombre amigable; los inventados por ti, con su código.</li>
+  <li>Si escribiste mal algún campo (por ejemplo, olvidaste cerrar los corchetes), aparece un <strong>aviso amarillo</strong> con el texto exacto a corregir.</li>
+  <li>Genera una constancia de prueba con cualquier alumno y revisa la vista previa.</li>
+</ol>
+
+<h2 id="errores">Errores comunes</h2>
+<table class="tabla">
+  <thead><tr><th scope="col">Síntoma</th><th scope="col">Causa y solución</th></tr></thead>
+  <tbody>
+    <tr><td>En el documento sale <code>[[NOMBRE]]</code> tal cual</td><td>El campo no existe con ese nombre. Revisa la lista de campos: es <code>[[NOMBRE_COMPLETO]]</code>. Si lo inventaste, aparecerá como casilla en el formulario: llénala.</td></tr>
+    <tr><td>Aviso «revisa esta plantilla en Word»</td><td>Hay corchetes sin cerrar o espacios dentro del nombre. El aviso muestra el texto exacto: corrígelo y sube la versión corregida.</td></tr>
+    <tr><td>Desapareció un párrafo que no debía</td><td>Pusiste un campo <code>_LINEA</code> junto a otro texto. Muévelo a un párrafo propio.</td></tr>
+    <tr><td>El sistema rechaza el archivo</td><td>No es .docx o está dañado. Ábrelo en Word y usa «Guardar como» .docx.</td></tr>
+  </tbody>
+</table>

@@ -1,0 +1,87 @@
+{% extends "base.html" %}
+{% from "_macros.html" import icono %}
+
+{% block titulo %}Centro de ayuda{% endblock %}
+{% block subtitulo %}Guías paso a paso para usar el sistema. Escribe lo que quieres hacer o elige un tema.{% endblock %}
+
+{% block contenido %}
+  <div class="ayuda-buscador">
+    <label for="buscarGuia" class="sr-only">Buscar en las guías</label>
+    <div class="combo combo--grande">
+      {{ icono("buscar", "combo-ico") }}
+      <input id="buscarGuia" type="search" placeholder="Ej. «crear plantilla», «semestre vacío», «subir excel»" value="{{ q }}" autocomplete="off" aria-describedby="buscarGuiaEstado">
+    </div>
+    <p class="hint" id="buscarGuiaEstado" role="status" aria-live="polite"></p>
+  </div>
+
+  <div class="ayuda-atajos">
+    <a class="atajo-card" href="/ayuda/generar-constancia">
+      {{ icono("pdf") }}<strong>Generar una constancia</strong><span>Lo más común, paso a paso</span>
+    </a>
+    <a class="atajo-card" href="/ayuda/crear-plantilla">
+      {{ icono("plantilla") }}<strong>Crear un tipo de constancia</strong><span>Plantillas de Word</span>
+    </a>
+    <a class="atajo-card" href="/ayuda/inicio-de-semestre">
+      {{ icono("calendario") }}<strong>Inicio de semestre</strong><span>Lo que se revisa cada periodo</span>
+    </a>
+    <a class="atajo-card" href="/ayuda/problemas-frecuentes">
+      {{ icono("alerta") }}<strong>Algo no funciona</strong><span>Problemas frecuentes</span>
+    </a>
+  </div>
+
+  <div id="listaGuias">
+  {% for clave, nombre, arts in categorias %}
+    <section class="ayuda-categoria" data-categoria aria-labelledby="cat-{{ clave }}">
+      <h2 id="cat-{{ clave }}">{{ nombre }}</h2>
+      <ul class="guias">
+        {% for a in arts %}
+        <li data-buscar="{{ (a.titulo ~ ' ' ~ a.resumen ~ ' ' ~ a.palabras) | lower }}">
+          <a class="guia-card" href="/ayuda/{{ a.slug }}">
+            <strong>{{ a.titulo }}</strong>
+            <span>{{ a.resumen }}</span>
+            {% if a.solo_admin %}<span class="field-tag">administrador</span>{% endif %}
+          </a>
+        </li>
+        {% endfor %}
+      </ul>
+    </section>
+  {% endfor %}
+  </div>
+
+  <section class="card card--suave ayuda-tambien" aria-labelledby="tituloTambien">
+    <h2 id="tituloTambien">{{ icono("puntero") }}Ayuda sin salir de la pantalla</h2>
+    <p>En cualquier pantalla pulsa <strong>Modo ayuda</strong> (arriba a la derecha) o la tecla <kbd>?</kbd>, y haz clic en lo que no entiendas. <a href="/ayuda/como-pedir-ayuda">Cómo funciona</a>.</p>
+  </section>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  // Filtro instantáneo de guías: sin importar acentos ni mayúsculas; todas
+  // las palabras escritas deben aparecer en el título, resumen o palabras clave.
+  (function () {
+    var input = document.getElementById("buscarGuia");
+    var estado = document.getElementById("buscarGuiaEstado");
+    var items = Array.prototype.slice.call(document.querySelectorAll("[data-buscar]"));
+    var quitar = function (s) { return s.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase(); };
+    items.forEach(function (li) { li._txt = quitar(li.getAttribute("data-buscar")); });
+    function filtrar() {
+      var palabras = quitar(input.value).split(/\s+/).filter(Boolean);
+      var n = 0;
+      items.forEach(function (li) {
+        var ok = palabras.every(function (p) { return li._txt.indexOf(p) >= 0; });
+        li.hidden = !ok;
+        if (ok) n++;
+      });
+      document.querySelectorAll("[data-categoria]").forEach(function (sec) {
+        sec.hidden = !sec.querySelector("[data-buscar]:not([hidden])");
+      });
+      estado.textContent = palabras.length
+        ? (n ? n + (n === 1 ? " guía encontrada." : " guías encontradas.") : "Ninguna guía coincide. Prueba con otras palabras o revisa «Problemas frecuentes».")
+        : "";
+    }
+    input.addEventListener("input", filtrar);
+    if (input.value) filtrar();
+    input.focus();
+  })();
+</script>
+{% endblock %}

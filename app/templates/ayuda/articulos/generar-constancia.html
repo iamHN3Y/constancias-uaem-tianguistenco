@@ -1,0 +1,38 @@
+{% from "_macros.html" import icono %}
+<p>Toma menos de un minuto. Puedes hacerlo como invitado o como administrador.</p>
+
+<h2 id="buscar">Paso 1. Buscar al alumno</h2>
+<ol class="pasos">
+  <li>En <a href="/">Inicio</a>, escribe en el buscador el <strong>número de cuenta</strong> o <strong>parte del nombre</strong>. No importan acentos ni mayúsculas: «perez juan» encuentra a «PÉREZ / JUAN».</li>
+  <li>Mientras escribes aparecen sugerencias. Elige al alumno con un clic, o con las flechas <kbd>↑</kbd> <kbd>↓</kbd> y <kbd>Enter</kbd>.</li>
+  <li>Si no aparece, revisa <a href="/ayuda/problemas-frecuentes#no-encuentra">por qué un alumno no se encuentra</a>.</li>
+</ol>
+<div class="consejo">{{ icono("info") }}<p>Desde cualquier parte de Inicio, la tecla <kbd>/</kbd> te lleva directo al buscador.</p></div>
+
+<h2 id="tipo">Elegir el tipo de constancia</h2>
+<p>Si hay varias plantillas (general, en inglés, prácticas…), elige el tipo debajo del buscador antes de continuar. Si ya estás en el formulario, puedes cambiarlo con la lista de arriba a la derecha sin volver a buscar al alumno.</p>
+
+<h2 id="revisar">Paso 2. Revisar los datos</h2>
+<p>Se abre el formulario con casi todo ya escrito. A la derecha está la <strong>vista previa</strong>: así quedará el documento, y se actualiza sola un momento después de cada cambio.</p>
+<p>Arriba verás un resumen de lo que dice el padrón del alumno (plan, periodo de ingreso, promedios, situación). Es solo de referencia.</p>
+
+<h3 id="campos">Qué revisar en el formulario</h3>
+<ul>
+  <li><strong>Género:</strong> cambia «el alumno / la alumna» en el texto. Si el padrón no trae la columna Sexo, márcalo a mano; el sistema no deja descargar sin él.</li>
+  <li><strong>Carrera:</strong> si ves un código como <code>ICO-F19</code> en lugar del nombre, la carrera no está dada de alta. Escríbela a mano por ahora y avísale al administrador (<a href="/ayuda/carreras">cómo se arregla</a>).</li>
+  <li><strong>Semestre y fechas:</strong> salen del periodo activo. Si están vacíos, falta configurar el periodo (<a href="/ayuda/problemas-frecuentes#semestre-vacio">ver solución</a>).</li>
+  <li><strong>Líneas opcionales:</strong> promedios, periodo vacacional y línea libre. Enciende solo las que deban aparecer. <a href="/ayuda/lineas-opcionales-y-frases">Más detalles</a>.</li>
+</ul>
+<p>Todo lo que cambies aquí aplica <strong>solo a esta constancia</strong>: no modifica el padrón.</p>
+<div class="consejo">{{ icono("puntero") }}<p>¿No sabes de dónde sale un dato? Activa el <strong>Modo ayuda</strong> y haz clic sobre el campo.</p></div>
+
+<h2 id="descargar">Paso 3. Descargar</h2>
+<ul>
+  <li><strong>Descargar PDF:</strong> listo para imprimir o enviar por correo. Es lo más común.</li>
+  <li><strong>Word:</strong> un .docx para ajustar algo a mano antes de imprimir.</li>
+</ul>
+<p>La barra de descarga avisa si quedó algún campo importante vacío («Faltan 2 campos: …»); haz clic en el nombre del campo para ir a él. Puedes descargar de todos modos si ese dato no aplica.</p>
+<p>Al terminar, el sistema te ofrece <strong>buscar otro alumno</strong> o hacer <strong>otro tipo de constancia</strong> para el mismo.</p>
+
+<h2 id="recientes">Volver a generar una constancia reciente</h2>
+<p>En Inicio, la sección <strong>Recientes en este equipo</strong> muestra las últimas constancias descargadas desde esta computadora. «Generar otra vez» abre el formulario del mismo alumno con la misma plantilla, ya con los datos actualizados. La lista solo existe en este navegador; puedes borrarla con «Borrar lista».</p>

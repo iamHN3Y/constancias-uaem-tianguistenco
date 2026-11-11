@@ -6,6 +6,9 @@ Aplicación web (FastAPI) para generar constancias escolares en `.docx` y `.pdf`
 
 ## Características
 
+- **Ayuda integrada**: botón *Modo ayuda* (o tecla `?`) que explica cualquier zona de la pantalla al hacer clic, recorridos guiados la primera vez, y un **centro de ayuda** (`/ayuda`) con guías paso a paso: crear y subir plantillas, inicio de semestre, padrón, problemas frecuentes.
+- **Buscador con sugerencias en vivo** por cuenta o nombre, y lista de **constancias recientes** por equipo para regenerarlas con un clic.
+- **Preparación del semestre**: Inicio revisa solo periodo, padrón, plantillas y carreras del padrón sin dar de alta, con el botón para arreglar cada cosa.
 - Carga de un padrón de alumnos (`.xls`, `.xlsx`, `.csv`) que persiste hasta que se reemplace.
 - Búsqueda de alumno por número de cuenta **o por nombre** (sin importar acentos ni mayúsculas).
 - **Varias plantillas con nombre** (constancia general, inglés, prácticas…), cada una con su historial.
@@ -224,8 +227,9 @@ constancias_app/
 │   ├── plantilla_universal.py       # plantillas con nombre + historial + cache autovalidado
 │   ├── comodines.py                 # snippets reutilizables (con lock)
 │   ├── bootstrap_plantillas/        # plantilla seed para el primer arranque
-│   ├── templates/                   # Jinja2: login, home, datos, plantillas, carreras, generar
-│   └── static/                      # CSS y JS
+│   ├── ayuda.py                     # índice de guías y ayuda por campo (modo ayuda)
+│   ├── templates/                   # Jinja2: base + vistas; ayuda/ = centro de ayuda y guías
+│   └── static/                      # CSS y JS (modo ayuda, recorrido, buscador, generar)
 ├── tests/                           # pytest: render, plantillas, catálogo, carreras, API
 └── data/                            # montado como volumen (persistente)
     ├── ajustes.json                 # periodo activo + meta del CSV

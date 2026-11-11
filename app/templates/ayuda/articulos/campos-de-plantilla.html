@@ -1,0 +1,29 @@
+{% from "_macros.html" import icono %}
+<p>Estos son los campos que el sistema sabe llenar solo. Escríbelos en tu plantilla de Word exactamente así, con dos corchetes de cada lado. Los ejemplos se calculan con el mismo motor que genera las constancias, así que se imprimen tal cual.</p>
+
+<table class="tabla tabla--campos">
+  <thead>
+    <tr><th scope="col">Escribe en Word</th><th scope="col">Qué es</th><th scope="col">Ejemplo de cómo se imprime</th></tr>
+  </thead>
+  <tbody>
+  {% for f in campos %}
+    <tr id="campo-{{ f.nombre | lower }}">
+      <td><code>[[{{ f.nombre }}]]</code>{% if f.opcional %}<br><span class="field-tag">opcional</span>{% endif %}</td>
+      <td><strong>{{ f.etiqueta }}</strong><br><span class="muted">{{ f.ayuda }}</span></td>
+      <td>{{ f.ejemplo }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+<h2 id="genero">Campos que dependen del género</h2>
+<p><code>[[ARTICULO]]</code> e <code>[[INTERESADO_FRASE]]</code> se escriben solos según el género que se marque al generar. Así una misma plantilla sirve para alumnos y alumnas: «Se hace constar que <em>el alumno</em>…» / «…<em>la alumna</em>…».</p>
+
+<h2 id="convenciones">Campos inventados por ti</h2>
+<p>Cualquier otro nombre entre corchetes dobles se convierte en una casilla del formulario. La terminación decide el tipo:</p>
+<ul>
+  <li><code>[[ALGO_FECHA]]</code> → calendario. Se imprime «02 de febrero de 2026».</li>
+  <li><code>[[ALGO_LINEA]]</code> → párrafo opcional con interruptor. Si queda vacío o apagado, el párrafo desaparece. Debe ir solo en su párrafo.</li>
+  <li>Cualquier otro → casilla de texto libre.</li>
+</ul>
+<div class="consejo">{{ icono("info") }}<p>Esta lista se genera desde el propio sistema: si en el futuro se agregan campos nuevos, aparecerán aquí solos.</p></div>

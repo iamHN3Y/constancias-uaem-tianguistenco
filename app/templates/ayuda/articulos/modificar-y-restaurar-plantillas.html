@@ -1,0 +1,24 @@
+{% from "_macros.html" import icono %}
+<p>Las plantillas cambian con el tiempo: nuevo responsable que firma, el lema del año, un teléfono distinto. Modificarlas es seguro: <strong>cada cambio guarda la versión anterior</strong>.</p>
+
+<h2 id="modificar">Modificar una plantilla</h2>
+<ol class="pasos">
+  <li>En <a href="/plantillas">Plantillas</a>, en la tarjeta de la plantilla, pulsa <strong>Descargar para editar</strong>.</li>
+  <li>Abre el archivo en Word y haz los cambios. Cuida no romper los campos <code>[[ ]]</code> (<a href="/ayuda/crear-plantilla#reglas">reglas</a>).</li>
+  <li>Guárdalo como .docx.</li>
+  <li>De vuelta en Plantillas, pulsa <strong>Subir versión corregida</strong> en la misma tarjeta, elige el archivo y confirma con <strong>Reemplazar</strong>.</li>
+  <li>Genera una constancia de prueba para revisar el resultado.</li>
+</ol>
+<p>Si el archivo nuevo tiene un problema (no es .docx o está dañado), se rechaza y la plantilla anterior sigue funcionando sin cambios.</p>
+
+<h2 id="restaurar">Recuperar una versión anterior</h2>
+<p>Si un cambio salió mal:</p>
+<ol class="pasos">
+  <li>En la tarjeta de la plantilla, abre <strong>Versiones anteriores</strong>.</li>
+  <li>Busca la fecha de la versión que funcionaba y pulsa <strong>Restaurar</strong>.</li>
+</ol>
+<p>La versión que estaba activa no se pierde: queda en el mismo historial, por si te arrepientes. Se guardan las <strong>últimas 10 versiones</strong> de cada plantilla.</p>
+
+<h2 id="eliminar">Eliminar un tipo de constancia</h2>
+<p>«Eliminar» borra la plantilla <strong>y todo su historial</strong>, sin posibilidad de recuperarla. Por seguridad el sistema pide escribir su nombre corto para confirmar, y no permite eliminar la última plantilla que queda. Si solo quieres cambiarla, usa «Subir versión corregida».</p>
+<div class="consejo">{{ icono("info") }}<p>Antes de un cambio grande, descarga la plantilla actual y guárdala en tu computadora como respaldo adicional.</p></div>

@@ -30,7 +30,7 @@ from fastapi.responses import (
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 
-from . import catalogo, derivar
+from . import ayuda, catalogo, derivar
 from .carreras import Carreras
 from .comodines import Comodines
 from .docx_render import render
@@ -80,6 +80,24 @@ async def _lifespan(app: FastAPI):
 
 app = FastAPI(title="Generador de Constancias", lifespan=_lifespan)
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
+# Versión de los estáticos: súbela al cambiar CSS/JS para que los navegadores
+# no usen la copia vieja en caché.
+templates.env.globals["V"] = "13"
+templates.env.globals["ayuda_campo"] = ayuda.ayuda_campo
+templates.env.filters["nombre_legible"] = derivar.formato_nombre
+
+
+def _fecha_legible(valor) -> str:
+    """'2026-11-10T23:44:52' → '10 nov 2026, 23:44'. Si no es ISO, lo deja igual."""
+    try:
+        d = datetime.fromisoformat(str(valor))
+    except (TypeError, ValueError):
+        return str(valor or "")
+    mes = derivar.MESES[d.month - 1][:3]
+    return f"{d.day} {mes} {d.year}, {d:%H:%M}" if (d.hour or d.minute) else f"{d.day} {mes} {d.year}"
+
+
+templates.env.filters["fecha_legible"] = _fecha_legible
 app.mount("/static", StaticFiles(directory=os.path.join(BASE_DIR, "static")), name="static")
 
 
@@ -536,14 +554,179 @@ async def home(request: Request):
     q_nombre = request.query_params.get("nombre", "")
     resultados = buscar_por_nombre(q_nombre) if q_nombre else []
 
+    lista_plantillas = plantillas.listar()
+    admin = es_admin(request)
     return templates.TemplateResponse(request, "home.html", {
         "datos": datos_meta(),
         "ni": ni_meta(),
-        "plantillas": plantillas.listar(),
+        "plantillas": lista_plantillas,
         "ajustes": aj,
-        "es_admin": es_admin(request),
+        "es_admin": admin,
         "q_nombre": q_nombre,
         "resultados": resultados,
+        "preparacion": preparacion_semestre(aj, lista_plantillas) if admin else None,
+    })
+
+
+def planes_sin_carrera() -> list[dict]:
+    """
+    Planes del padrón cuyo prefijo no está en el catálogo de carreras: en la
+    constancia saldrían como código crudo (ICO-F19) en lugar del nombre.
+    [{codigo, alumnos}] ordenado por cantidad de alumnos afectados.
+    """
+    df = leer_datos()
+    if df.empty or "Plan" not in df.columns:
+        return []
+    conocidas = carreras.listar()["carreras"]
+    conteo: dict[str, int] = {}
+    for plan in df["Plan"].astype(str):
+        codigo = plan.split("-", 1)[0].strip().upper()
+        if codigo and codigo not in conocidas:
+            conteo[codigo] = conteo.get(codigo, 0) + 1
+    return [{"codigo": c, "alumnos": n}
+            for c, n in sorted(conteo.items(), key=lambda kv: -kv[1])]
+
+
+def preparacion_semestre(aj: dict, lista_plantillas: list[dict]) -> dict:
+    """
+    Lista de verificación del administrador para dejar el semestre listo.
+    Cada paso: {clave, titulo, ok, detalle, url, accion}. `listo` es True
+    cuando todos los pasos obligatorios están completos.
+    """
+    datos = datos_meta()
+    listas = [it for it in lista_plantillas if it["info"]]
+    con_avisos = [it["nombre"] for it in listas if it["info"].get("avisos")]
+    sin_carrera = planes_sin_carrera() if datos else []
+
+    periodo = aj.get("periodo_actual", "")
+    fechas_ok = bool(aj.get("periodo_fecha_inicio") and aj.get("periodo_fecha_fin"))
+    if not periodo:
+        det_periodo = "Sin periodo: el semestre y las fechas no se pueden calcular."
+    elif not fechas_ok:
+        det_periodo = f"Periodo {periodo}. Faltan las fechas reales de inicio y fin (se usarán las típicas)."
+    else:
+        det_periodo = f"Periodo {periodo} configurado con sus fechas."
+
+    pasos = [
+        {
+            "clave": "periodo", "titulo": "Periodo activo y fechas",
+            "ok": bool(periodo), "parcial": bool(periodo) and not fechas_ok,
+            "detalle": det_periodo, "url": "#periodo", "accion": "Configurar",
+        },
+        {
+            "clave": "padron", "titulo": "Padrón de alumnos",
+            "ok": bool(datos), "parcial": False,
+            "detalle": (f"{datos['filas']} alumno{'s' if datos['filas'] != 1 else ''} · {datos['filename']}" if datos
+                        else "Aún no hay alumnos cargados."),
+            "url": "/datos", "accion": "Actualizar" if datos else "Subir padrón",
+        },
+        {
+            "clave": "plantillas", "titulo": "Plantillas",
+            "ok": bool(listas), "parcial": bool(con_avisos),
+            "detalle": (f"Revisa en Word: {', '.join(con_avisos)} tiene campos mal escritos." if con_avisos
+                        else f"{len(listas)} lista{'s' if len(listas) != 1 else ''} para usarse." if listas
+                        else "No hay ninguna plantilla."),
+            "url": "/plantillas", "accion": "Revisar" if listas else "Subir plantilla",
+        },
+        {
+            "clave": "carreras", "titulo": "Carreras del padrón",
+            "ok": bool(datos) and not sin_carrera, "parcial": False,
+            "detalle": (
+                "Sube primero el padrón." if not datos
+                else "Todas las carreras del padrón están dadas de alta." if not sin_carrera
+                else "Sin nombre de carrera: " + ", ".join(
+                    f"{x['codigo']} ({x['alumnos']} alumno{'s' if x['alumnos'] != 1 else ''})"
+                    for x in sin_carrera[:4]) + ("…" if len(sin_carrera) > 4 else "")
+            ),
+            "url": "/carreras", "accion": "Dar de alta" if sin_carrera else "Ver catálogo",
+        },
+    ]
+    hechos = sum(1 for p in pasos if p["ok"])
+    return {"pasos": pasos, "hechos": hechos, "total": len(pasos),
+            "listo": hechos == len(pasos) and not any(p["parcial"] for p in pasos)}
+
+
+# ---------- API: búsqueda en vivo ----------
+
+@app.get("/api/alumnos")
+async def api_alumnos(request: Request, q: str = ""):
+    """
+    Sugerencias para el buscador mientras se escribe: por inicio del número
+    de cuenta si son dígitos, por nombre en cualquier otro caso.
+    """
+    if get_rol(request) is None:
+        raise HTTPException(status_code=401, detail="Inicia sesión")
+    q = q.strip()
+    if len(q) < 2:
+        return JSONResponse([])
+    limite = 8
+    if q.isdigit():
+        encontrados, vistos = [], set()
+        for df, origen in ((leer_datos(), ""), (leer_nuevo_ingreso(), "nuevo_ingreso")):
+            if df.empty or "Cuenta" not in df.columns:
+                continue
+            for _, fila in df.loc[df["Cuenta"].astype(str).str.startswith(q)].iterrows():
+                cuenta = str(fila.get("Cuenta", "")).strip()
+                if cuenta in vistos:
+                    continue
+                vistos.add(cuenta)
+                reg = {k: str(v) for k, v in fila.to_dict().items()}
+                if origen:
+                    reg["_origen"] = origen
+                encontrados.append(reg)
+                if len(encontrados) >= limite:
+                    break
+            if len(encontrados) >= limite:
+                break
+    else:
+        encontrados = buscar_por_nombre(q, limite=limite)
+    return JSONResponse([
+        {
+            "cuenta": r.get("Cuenta", ""),
+            "nombre": derivar.formato_nombre(r.get("NombreAlumno", "")),
+            "plan": r.get("Plan", ""),
+            "nuevo_ingreso": r.get("_origen") == "nuevo_ingreso",
+        }
+        for r in encontrados
+    ])
+
+
+# ---------- Centro de ayuda ----------
+# Abierto sin sesión: es documentación, sirve también desde la pantalla de acceso.
+
+@app.get("/ayuda", response_class=HTMLResponse)
+async def ayuda_index(request: Request):
+    return templates.TemplateResponse(request, "ayuda/index.html", {
+        "categorias": ayuda.por_categoria(),
+        "q": request.query_params.get("q", ""),
+    })
+
+
+@app.get("/ayuda/plantilla-ejemplo.docx")
+async def ayuda_plantilla_ejemplo():
+    """La plantilla original del sistema, como punto de partida para crear otras."""
+    return FileResponse(
+        BOOTSTRAP_PLANTILLA,
+        media_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        filename="Plantilla de ejemplo - Constancia.docx",
+    )
+
+
+@app.get("/ayuda/{slug}", response_class=HTMLResponse)
+async def ayuda_articulo(request: Request, slug: str):
+    art = ayuda.articulo(slug)
+    if not art:
+        return RedirectResponse(url="/ayuda", status_code=303)
+    ant, sig = ayuda.vecinos(slug)
+    cat = carreras.listar()
+    return templates.TemplateResponse(request, "ayuda/articulo.html", {
+        "art": art,
+        "anterior": ant,
+        "siguiente": sig,
+        "categorias": ayuda.por_categoria(),
+        "campos": ayuda.referencia_campos(),
+        "columnas_padron": COLUMNAS_CANONICAS,
+        "catalogo": cat,
     })
 
 
@@ -665,6 +848,7 @@ async def plantillas_page(request: Request):
     if bloqueo: return bloqueo
     return templates.TemplateResponse(request, "plantillas.html", {
         "items": plantillas.listar(),
+        "etiquetas": {k: v["label"] for k, v in catalogo.ETIQUETAS.items()},
     })
 
 
@@ -753,6 +937,7 @@ async def carreras_page(request: Request):
     if bloqueo: return bloqueo
     return templates.TemplateResponse(request, "carreras.html", {
         "catalogo": carreras.listar(),
+        "sin_carrera": planes_sin_carrera(),
     })
 
 
@@ -833,12 +1018,19 @@ async def generar_page(request: Request, cuenta: str, plantilla: str = ""):
 
     aj = cargar_ajustes()
     campos = catalogo.construir_campos_form(info["placeholders"], alumno, aj, carreras)
+    # Orden lógico (el del catálogo: nombre, cuenta, carrera… inicio antes que
+    # fin) en vez del alfabético de la detección; los campos propios de la
+    # plantilla van después, en su orden.
+    orden = {nombre: i for i, nombre in enumerate(catalogo.ETIQUETAS)}
+    orden["ARTICULO"] = -1  # el género primero: es el dato que más se revisa a mano
+    campos.sort(key=lambda c: orden.get(c["name"], len(orden)))
 
     return templates.TemplateResponse(request, "generar.html", {
         "alumno": alumno,
         "plantilla": info,
         "plantilla_slug": slug,
         "plantilla_nombre": plantillas.nombre_de(slug),
+        "plantillas_listas": [it for it in plantillas.listar() if it["info"]],
         "campos": campos,
         "ajustes": aj,
     })
