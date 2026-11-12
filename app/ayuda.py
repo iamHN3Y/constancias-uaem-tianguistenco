@@ -186,7 +186,7 @@ AYUDA_CAMPOS: dict[str, str] = {
     "NOMBRE_COMPLETO": "Se toma del padrón tal como viene («APELLIDOS NOMBRES»), solo sin la diagonal. Si el padrón trae un error, corrígelo aquí: el cambio solo afecta a esta constancia.",
     "CUENTA": "Número de cuenta del alumno, tal como viene en el padrón.",
     "CARRERA_FULL": "Sale del catálogo de Carreras según el plan del alumno. Si aquí ves un código (por ejemplo ICO-F19) en lugar del nombre, esa carrera no está dada de alta: el administrador la agrega en Carreras y queda corregido para siempre.",
-    "SEMESTRE_TEXTO": "Se calcula solo, comparando el periodo de ingreso del alumno con el periodo activo. Si sale vacío, falta configurar el periodo activo o el alumno es de nuevo ingreso.",
+    "SEMESTRE_TEXTO": "Se calcula solo, comparando el periodo de ingreso del alumno con el periodo activo. Si sale vacío, falta configurar el periodo activo o el padrón no trae el periodo de ingreso del alumno.",
     "SEMESTRES_TOTALES": "Cuántos semestres dura el plan del alumno, según el catálogo de Carreras.",
     "PERIODO_INICIO": "Fecha de inicio del semestre que guardó el administrador. Puedes cambiarla solo para esta constancia.",
     "PERIODO_FIN": "Fecha de fin del semestre que guardó el administrador. Puedes cambiarla solo para esta constancia.",

@@ -1,253 +1,72 @@
 # Generador de Constancias — UAEM Tianguistenco
 
-Aplicación web (FastAPI) para generar constancias escolares en `.docx` y `.pdf` desde una **plantilla universal** con placeholders `[[CAMPO]]`. Se distribuye como una imagen Docker.
+Aplicación web para que el personal de Servicios Escolares genere constancias escolares en **PDF** o **Word** en menos de un minuto: se busca al alumno, el sistema llena sus datos desde el padrón en una plantilla de Word con campos `[[CAMPO]]`, se revisa con la vista previa y se descarga. Se distribuye como imagen Docker (FastAPI + LibreOffice), sin base de datos.
 
-> **Documentación completa**: [docs/INDEX.md](docs/INDEX.md) — manual de usuario para personal administrativo y documentación técnica con diagramas de arquitectura para quien mantenga el código.
+## Documentación
+
+| Si quieres… | Lee |
+|---|---|
+| Usar el sistema (generar, plantillas, inicio de semestre) | La ayuda **dentro del sistema**: botón *Modo ayuda* (tecla `?`) y *Guías* (`/ayuda`). Resumen: [docs/MANUAL_USUARIO.md](docs/MANUAL_USUARIO.md) |
+| Instalar, actualizar, respaldar o resolver problemas del servidor | [docs/OPERACION.md](docs/OPERACION.md) |
+| Entender o modificar el código | [docs/TECNICA.md](docs/TECNICA.md) |
+| Saber qué mejorar y en qué orden | [docs/MEJORAS_FUTURAS.md](docs/MEJORAS_FUTURAS.md) |
+| Ver qué cambió en cada versión | [CHANGELOG.md](CHANGELOG.md) |
+
+Índice completo: [docs/INDEX.md](docs/INDEX.md).
 
 ## Características
 
-- **Ayuda integrada**: botón *Modo ayuda* (o tecla `?`) que explica cualquier zona de la pantalla al hacer clic, recorridos guiados la primera vez, y un **centro de ayuda** (`/ayuda`) con guías paso a paso: crear y subir plantillas, inicio de semestre, padrón, problemas frecuentes.
-- **Buscador con sugerencias en vivo** por cuenta o nombre, y lista de **constancias recientes** por equipo para regenerarlas con un clic.
-- **Preparación del semestre**: Inicio revisa solo periodo, padrón, plantillas y carreras del padrón sin dar de alta, con el botón para arreglar cada cosa.
-- Carga de un padrón de alumnos (`.xls`, `.xlsx`, `.csv`) que persiste hasta que se reemplace.
-- Búsqueda de alumno por número de cuenta **o por nombre** (sin importar acentos ni mayúsculas).
-- **Varias plantillas con nombre** (constancia general, inglés, prácticas…), cada una con su historial.
-- **Alumnos de nuevo ingreso**: archivo secundario (Excel de control escolar) para alumnos que aún no están en el padrón principal; se consulta solo como respaldo y el padrón principal siempre tiene prioridad.
-- **Catálogo de carreras editable desde la UI** (`/carreras`): altas de carreras y duraciones de plan sin tocar código.
-- Género prellenado desde la columna `Sexo` del Excel (acepta M/F, H/M, MASCULINO/FEMENINO, HOMBRE/MUJER).
-- Vista previa PDF en vivo (iframe) con cada cambio del formulario.
-- Selectores de fecha para periodo de inicio/fin, fecha de expedición y periodo vacacional — el texto formal en español se deriva en el backend.
-- **Fechas del semestre configurables una sola vez**: el admin guarda inicio/fin del periodo junto con el periodo activo y todas las constancias salen prellenadas; el semestre en letra se calcula solo comparando el periodo de ingreso del alumno con el periodo activo.
-- Líneas opcionales (promedios, periodo vacacional, línea libre) que **se eliminan automáticamente** del documento si quedan vacías.
-- Catálogo de **comodines** (snippets reutilizables) para la línea libre.
-- Pseudo-login con dos roles: **admin** (carga datos y plantilla) e **invitado** (solo genera).
-- Convenciones automáticas por nombre de placeholder (`_LINEA`, `_FECHA`) — extienden el formulario sin tocar código.
-- **Historial de plantillas**: cada reemplazo respalda la versión anterior y se puede restaurar desde la UI.
-- **Detección siempre fresca**: si la plantilla cambia en disco (aunque no sea por la UI), los placeholders se re-escanean solos.
-- Validación al subir: una plantilla corrupta o un Excel sin columna `Cuenta` se rechazan sin tocar lo que ya funcionaba.
+**Para quien genera constancias**
+- Buscador con **sugerencias en vivo** por número de cuenta o nombre (sin importar acentos ni mayúsculas).
+- Formulario **prellenado**: nombre, carrera, semestre en letra, fechas del periodo, género, promedios con número y letra.
+- **Vista previa PDF en vivo** con cada cambio; aviso de campos vacíos antes de descargar.
+- **Líneas opcionales** (promedios, periodo vacacional, línea libre) que desaparecen del documento si se apagan, y **frases guardadas** reutilizables.
+- **Constancias recientes** por equipo para regenerarlas con un clic.
 
-## Requisitos
+**Para quien administra**
+- **Preparación del semestre**: Inicio revisa periodo, padrón, plantillas y carreras del padrón sin dar de alta, con el botón para arreglar cada cosa.
+- Padrón en `.xls`, `.xlsx` o `.csv`, tolerante a cambios de formato; archivo aparte para **alumnos de nuevo ingreso**.
+- **Varias plantillas** (general, inglés, prácticas…) con **historial de 10 versiones** y restauración en un clic; campos nuevos con solo escribirlos en Word (`[[ALGO]]`, `[[ALGO_FECHA]]`, `[[ALGO_LINEA]]`).
+- **Catálogo de carreras** editable desde la interfaz.
 
-- Docker Desktop (Windows/macOS) o Docker Engine (Linux).
-- ~500 MB libres para la imagen (incluye `libreoffice-writer` para la conversión a PDF).
+**Ayuda integrada**
+- **Modo ayuda**: al activarlo, cualquier zona de la pantalla explica qué hace al hacer clic.
+- **Recorridos guiados** la primera vez que se abre cada pantalla.
+- **Centro de ayuda** con 13 guías, buscador e impresión (crear plantillas, inicio de semestre, problemas frecuentes…).
 
-## Construcción
+## Inicio rápido
 
-Desde la raíz del proyecto (donde está `Dockerfile`):
+Requisitos: Docker Desktop (Windows/macOS) o Docker Engine (Linux), ~1 GB libre.
 
 ```powershell
 docker build -t constancias .
+docker run -d --name constancias --restart unless-stopped -p 8000:8000 `
+  -v "${PWD}/data:/app/data" -e ADMIN_PASSWORD="una-contraseña-propia" constancias
 ```
 
-## Ejecución
+Abre <http://localhost:8000>. Arranque automático, actualizaciones, respaldos y solución de problemas: [docs/OPERACION.md](docs/OPERACION.md).
 
-### Primera vez (recomendado)
+> **Importante.** Cambia siempre `ADMIN_PASSWORD` (la de fábrica, `admin2026`, es pública). El control de acceso es básico y está pensado para la **red interna**: no expongas el puerto a Internet sin un proxy con TLS y autenticación real. Detalle en [TECNICA.md §12](docs/TECNICA.md#12-seguridad-modelo-actual-y-límites).
 
-Usa `--name` para identificar el contenedor y `--restart unless-stopped` para que Docker lo levante solo cuando arranque el daemon:
+## Roles
 
-```powershell
-docker run -d `
-  --name constancias `
-  --restart unless-stopped `
-  -p 8000:8000 `
-  -v "${PWD}/data:/app/data" `
-  -e ADMIN_PASSWORD="cambia-esto" `
-  constancias
-```
+- **Invitado** (sin contraseña): busca alumnos y genera constancias.
+- **Administrador** (`ADMIN_PASSWORD`): además carga el padrón y el archivo de nuevo ingreso, gestiona plantillas y carreras y configura el periodo activo.
 
-- `-d` → modo detached (en background).
-- `--name constancias` → identifica al contenedor.
-- `--restart unless-stopped` → se relanza al reiniciar Docker; solo no arranca si tú lo detuviste explícitamente.
-- `-v "${PWD}/data:/app/data"` → monta la carpeta `data/` para persistir CSV, plantilla, comodines, ajustes.
-- `-e ADMIN_PASSWORD="..."` → contraseña del rol admin (default `admin2026` si se omite).
-
-Abre <http://localhost:8000>. Verás la pantalla de login.
-
-### Operación diaria (mismo contenedor)
-
-```powershell
-docker stop constancias        # detener
-docker start constancias       # volver a arrancar (NO crea uno nuevo)
-docker logs -f constancias     # seguir los logs
-docker restart constancias     # reiniciar
-```
-
-> **Importante**: si vuelves a correr `docker run` lanzas un contenedor nuevo (te quejarás de que "se crean nuevos cada vez"). Usa `docker start <nombre>` para reusar el existente.
-
-### Actualizar el código
-
-```powershell
-docker stop constancias
-docker rm constancias
-docker build -t constancias .
-docker run -d --name constancias --restart unless-stopped -p 8000:8000 -v "${PWD}/data:/app/data" -e ADMIN_PASSWORD="..." constancias
-```
-
-El volumen `data/` sobrevive al `docker rm`, así que los datos cargados se conservan.
-
-## Arranque automático en el servidor (Windows)
-
-Dos pasos:
-
-1. **Que Docker Desktop arranque al iniciar Windows**
-   Abre Docker Desktop → ⚙ Settings → *General* → marca **"Start Docker Desktop when you sign in"**.
-
-2. **Que el contenedor se levante con Docker**
-   Si lo creaste con `--restart unless-stopped` (ver arriba), Docker lo iniciará automáticamente cada vez que arranque su daemon. No necesitas hacer nada más.
-
-> En Windows, Docker Desktop se ejecuta cuando el usuario inicia sesión. Si la PC servidor reinicia, asegúrate de que ese usuario haga login (o configura inicio automático de sesión de Windows). Para auto-arranque sin login interactivo, considera correr Docker Engine en WSL2 con un servicio o migrar a Linux con systemd.
-
-### Linux con systemd (alternativa)
-
-```ini
-# /etc/systemd/system/constancias.service
-[Unit]
-Description=Generador de Constancias
-Requires=docker.service
-After=docker.service
-
-[Service]
-Restart=always
-ExecStart=/usr/bin/docker start -a constancias
-ExecStop=/usr/bin/docker stop -t 10 constancias
-
-[Install]
-WantedBy=multi-user.target
-```
-
-```bash
-sudo systemctl enable constancias
-sudo systemctl start constancias
-```
-
-## Roles y contraseña admin
-
-- **Invitado**: genera constancias. No puede subir datos ni plantilla.
-- **Admin**: todo lo anterior + subir base de datos, reemplazar la plantilla universal, definir el periodo activo.
-
-La contraseña admin se lee de la variable `ADMIN_PASSWORD` al arranque (default `admin2026`). Cambia siempre el default antes de usarlo en un entorno real.
-
-## Plantillas
-
-Puede haber **varias plantillas** (p. ej. "Constancia general", "Constancia en inglés", "Prácticas profesionales"). Cada una vive en su propia carpeta `data/plantillas/<slug>/universal.docx`, con su historial y su cache de placeholders. El registro de nombres está en `data/plantillas/registro.json`. Si vienes de una versión anterior (un solo `universal.docx` suelto), la migración al nuevo layout es automática al arrancar.
-
-Cuando hay más de una plantilla, en la pantalla principal aparece un selector de "Tipo de constancia".
-
-Para editar una plantilla:
-
-- **Desde la UI** (recomendado): login admin → "Gestionar plantillas" → *Descargar* → editar en Word → *Reemplazar*. La subida se valida antes de aceptarse y la versión anterior queda en el historial.
-- **Editando directo**: abre el `.docx` en `data/plantillas/<slug>/` en Word, cambia textos/formato, guarda. El sistema detecta el cambio automáticamente (compara tamaño y fecha del archivo) y re-escanea los placeholders — no hace falta reiniciar ni volver a subir nada. *Ojo*: por esta vía no se genera respaldo en el historial.
-
-### Convenciones de placeholders
-
-El **nombre** del placeholder decide su comportamiento; ninguna requiere tocar código:
-
-| Forma | Comportamiento |
-|---|---|
-| `[[CUALQUIER_NOMBRE]]` | Input de texto libre en el formulario. |
-| `[[ALGO_LINEA]]` o `[[LINEA_LIBRE]]` | Párrafo **opcional**: textarea con interruptor; si queda vacío, el párrafo desaparece del .docx final. |
-| `[[ALGO_FECHA]]` | Selector de fecha; se imprime como texto formal corto ("02 de febrero de 2026"). |
-| Well-known (`[[NOMBRE_COMPLETO]]`, `[[CUENTA]]`, …) | Etiqueta y control específicos + valor prellenado desde el Excel. Ver `app/catalogo.py` (`ETIQUETAS`). |
-
-Detalles que perdonan errores humanos:
-
-- Se aceptan espacios pegados a los corchetes (`[[ NOMBRE ]]`) y minúsculas (`[[nombre]]`); el nombre se normaliza a MAYÚSCULAS. También se admiten acentos y Ñ (`[[AÑO]]`).
-- Los placeholders funcionan en el cuerpo, en **tablas** (incluso anidadas), en **encabezados y pies de página** y en **cuadros de texto** de Word.
-- Si un placeholder quedó **mal escrito** (corchetes sin cerrar, espacios dentro del nombre), la página "Gestionar plantilla" muestra un aviso indicando el texto exacto a corregir.
-- Word suele partir el texto en fragmentos internos ("runs") al editar; el sistema los une antes de buscar, así que no importa cómo quedó guardado.
-
-Ejemplo: agregas `[[BECA_LINEA]]` en Word, lo subes desde la UI (o lo guardas directo en `data/plantillas/`), y aparece automáticamente como textarea opcional en el formulario, marcado con la etiqueta «plantilla».
-
-### Historial de versiones
-
-Cada reemplazo de plantilla guarda una copia de la anterior en `data/plantillas/<slug>/historial/` (se conservan las últimas 10). Desde "Gestionar plantillas" puedes restaurar cualquier versión con un clic; restaurar también respalda la versión activa, así que nunca se pierde nada.
-
-## Periodo activo y fechas del semestre
-
-En la pantalla principal (solo admin) se configura **una vez por semestre**:
-
-- **Periodo** (ej. `2026A`): con él se calcula el semestre en letra de cada alumno (`PerInicio` 2023B + periodo 2026A → "sexto").
-- **Inicio y fin del periodo**: fechas reales del calendario escolar. Prellenan los campos «Inicio/Fin del periodo» de todas las constancias. Si se dejan vacías se usan las fechas típicas (02 de febrero / 02 de agosto) como aproximación, siempre editables en cada constancia.
-
-Si no hay periodo activo configurado, la página de generación lo avisa (es la causa típica de que «Semestre» y las fechas aparezcan vacíos).
-
-## Catálogo de carreras (`/carreras`, solo admin)
-
-Convierte el plan del Excel (`ICO-F19`) en el nombre completo de la carrera y define cuántos semestres dura cada plan. Vive en `data/carreras.json` y se edita desde la UI:
-
-- **Carreras**: código = prefijo del plan (`ICO`), más el nombre completo tal como debe imprimirse. Un plan cuyo prefijo no esté en el catálogo se muestra crudo (el usuario puede corregirlo a mano en el formulario) — dar de alta la carrera lo arregla para siempre.
-- **Duraciones**: solo para planes que no duran 10 semestres, llaveado por código completo (`IPI-F26` → 9) porque una reestructuración cambia la duración sin cambiar el prefijo.
-
-Los cambios aplican de inmediato, sin reiniciar. El archivo también se puede editar a mano si hiciera falta.
-
-## Datos de alumnos
-
-Al subir el padrón:
-
-- Las columnas se emparejan **sin importar mayúsculas, acentos ni espacios** (`CUENTA`, `per inicio` → `Cuenta`, `PerInicio`), para tolerar cambios de formato del Excel de control escolar.
-- Un archivo sin columna `Cuenta`, vacío o ilegible se **rechaza con un mensaje claro** y los datos anteriores quedan intactos.
-- Las cuentas que Excel entrega como número flotante (`2014694.0`) se normalizan solas.
-- Si `PrmGR`/`Per` traen valores no numéricos, las líneas de promedio simplemente quedan vacías (editables a mano) en lugar de fallar.
-- Si existe columna `Sexo`, el género se prellena en el formulario. Se aceptan los esquemas M/F, H/M, MASCULINO/FEMENINO y HOMBRE/MUJER; la letra `M` ambigua se interpreta según el esquema del propio archivo.
-- La pantalla `/datos` incluye un panel de salud de solo lectura: total de alumnos, cuántos no tienen columna `Sexo` (o la tienen vacía), y cuántos alumnos solo existen en el archivo de nuevo ingreso.
-
-### Alumnos de nuevo ingreso
-
-Archivo secundario (`data/nuevo_ingreso.csv`), cargado desde un Excel de control escolar sin fila de encabezado (columnas posicionales: Cuenta, Apellido paterno, Apellido materno, Nombre(s), Plan, Periodo). Reglas:
-
-- Se consulta **solo como respaldo**: si la cuenta ya está en el padrón principal (`datos.csv`), ese siempre gana. Nunca se fusiona con el padrón principal.
-- El nombre se compone como `"APELLIDOS / NOMBRES"` (mismo formato que el padrón real), tolerando apellido materno vacío.
-- Al subir un padrón principal nuevo, las cuentas que ya aparezcan ahí se **purgan automáticamente** de `nuevo_ingreso.csv` (evita duplicados fantasma cuando un alumno de nuevo ingreso avanza de semestre).
-- La búsqueda por cuenta y por nombre completan resultados desde este archivo cuando no hay coincidencia en el padrón principal; los resultados de nuevo ingreso no se repiten si la cuenta ya salió del padrón.
-
-## Tests
+## Desarrollo
 
 ```powershell
 python -m venv .venv
 .venv\Scripts\pip install -r requirements-dev.txt
 .venv\Scripts\python -m pytest tests -q
+.venv\Scripts\uvicorn app.main:app --reload
 ```
 
-Cubren el motor de render (placeholders partidos en runs, headers/footers, tablas anidadas, líneas opcionales), la gestión de plantilla (cache auto-validado, subidas corruptas, historial/restauración), las convenciones del catálogo y un flujo completo de API. Ejecútalos antes de desplegar cualquier cambio.
-
-## Estructura del proyecto
+Sin LibreOffice instalado localmente, todo funciona salvo la vista previa y la descarga en PDF (Word sí). Las pruebas no necesitan LibreOffice. Antes de desplegar cualquier cambio: pruebas en verde y un recorrido manual Inicio → Generar → Descargar. Estructura del código, convenciones y recetas para cambios comunes: [docs/TECNICA.md](docs/TECNICA.md).
 
 ```
-constancias_app/
-├── Dockerfile                       # python:3.11-slim + libreoffice-writer
-├── README.md
-├── requirements.txt
-├── app/
-│   ├── main.py                      # endpoints FastAPI
-│   ├── catalogo.py                  # placeholders well-known + convenciones (tipo_de)
-│   ├── carreras.py                  # catálogo editable de carreras y duraciones
-│   ├── derivar.py                   # texto formal en español (fechas, números, género)
-│   ├── docx_render.py               # detección y reemplazo de placeholders
-│   ├── pdf.py                       # docx → pdf vía LibreOffice headless
-│   ├── plantilla_universal.py       # plantillas con nombre + historial + cache autovalidado
-│   ├── comodines.py                 # snippets reutilizables (con lock)
-│   ├── bootstrap_plantillas/        # plantilla seed para el primer arranque
-│   ├── ayuda.py                     # índice de guías y ayuda por campo (modo ayuda)
-│   ├── templates/                   # Jinja2: base + vistas; ayuda/ = centro de ayuda y guías
-│   └── static/                      # CSS y JS (modo ayuda, recorrido, buscador, generar)
-├── tests/                           # pytest: render, plantillas, catálogo, carreras, API
-└── data/                            # montado como volumen (persistente)
-    ├── ajustes.json                 # periodo activo + meta del CSV
-    ├── datos.csv                    # padrón de alumnos
-    ├── nuevo_ingreso.csv            # respaldo: alumnos aún no en el padrón principal
-    ├── comodines.json               # generado en runtime
-    ├── carreras.json                # catálogo de carreras (editable desde /carreras)
-    ├── plantillas/
-    │   ├── registro.json            # nombres y slugs de las plantillas
-    │   └── <slug>/                  # una carpeta por plantilla
-    │       ├── universal.docx       # archivo activo
-    │       ├── _meta.json           # cache de placeholders (autovalidado por mtime/tamaño)
-    │       └── historial/           # respaldos automáticos (últimas 10 versiones)
-    └── tmp/                         # archivos temporales
+app/        código (main.py, módulos de dominio, templates/, static/)
+tests/      pruebas (pytest)
+docs/       documentación
+data/       estado del sistema: padrón, plantillas, ajustes (volumen Docker, no se versiona)
 ```
-
-## Notas operativas
-
-- **Concurrencia**: la generación de PDFs es segura entre sesiones (cada request usa UUID único + perfil temporal de LibreOffice). La creación de comodines está protegida con un lock para evitar perder uno cuando dos clics llegan al mismo tiempo.
-- **Rendimiento**: LibreOffice consume ~150 MB y CPU por conversión. Para mucha concurrencia, ejecuta varias réplicas detrás de un proxy.
-- **Seguridad**: el "login" es solo gating de UI con cookie sin firmar. No expongas el servicio a Internet sin un proxy con TLS y/o auth real (Basic Auth, OAuth, etc.).

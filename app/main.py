@@ -82,7 +82,7 @@ app = FastAPI(title="Generador de Constancias", lifespan=_lifespan)
 templates = Jinja2Templates(directory=os.path.join(BASE_DIR, "templates"))
 # Versión de los estáticos: súbela al cambiar CSS/JS para que los navegadores
 # no usen la copia vieja en caché.
-templates.env.globals["V"] = "13"
+templates.env.globals["V"] = "14"
 templates.env.globals["ayuda_campo"] = ayuda.ayuda_campo
 templates.env.filters["nombre_legible"] = derivar.formato_nombre
 

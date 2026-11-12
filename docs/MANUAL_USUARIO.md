@@ -1,6 +1,6 @@
 # Manual de usuario — Generador de Constancias
 
-Guía para el personal del Centro Universitario UAEM Tianguistenco que usa esta herramienta para generar constancias escolares. Para detalles técnicos del sistema, ver [TECNICA.md](TECNICA.md).
+Guía para el personal del Centro Universitario UAEM Tianguistenco que usa esta herramienta para generar constancias escolares. Para instalar o mantener el servidor, ver [OPERACION.md](OPERACION.md); para detalles técnicos, [TECNICA.md](TECNICA.md).
 
 > **La ayuda completa y actualizada está dentro del sistema:** pulsa **Modo ayuda** (o la tecla `?`) y haz clic en cualquier parte de la pantalla, o abre **Guías** en la barra superior (`/ayuda`). Este archivo es un resumen para leer fuera del sistema.
 
@@ -23,14 +23,14 @@ flowchart TD
 
     HomeA --> Periodo["Configurar periodo activo<br/>(una vez por semestre)"]
     HomeA --> Datos["Cargar padrón /<br/>nuevo ingreso"]
-    HomeA --> Plantillas["Gestionar plantillas"]
-    HomeA --> Carreras["Gestionar carreras"]
+    HomeA --> Plantillas["Plantillas"]
+    HomeA --> Carreras["Carreras"]
     HomeA --> Buscar["Buscar alumno"]
 
     HomeI --> Buscar
 
     Buscar --> Generar["Completar formulario<br/>+ vista previa en vivo"]
-    Generar --> Descargar["Descargar .docx / .pdf"]
+    Generar --> Descargar["Descargar PDF / Word"]
 
     style HomeA fill:#e8f0fe
     style HomeI fill:#fef3e0
@@ -43,23 +43,23 @@ La tarjeta **Preparación del semestre** de la pantalla principal revisa sola es
 
 1. **Configurar el periodo activo.** En la pantalla principal, en la tarjeta "Periodo activo", escribe el periodo en curso (ej. `2026A`) y, si las conoces, las fechas reales de inicio y fin del semestre. Esto es lo que permite que el sistema calcule solo el semestre de cada alumno y prellene las fechas en cada constancia. Si no lo configuras, esos campos saldrán vacíos y tendrás que llenarlos a mano en cada documento.
 
-2. **Cargar el padrón de alumnos.** Ve a "Gestionar datos" → sube el archivo `.xls`, `.xlsx` o `.csv` con los alumnos (el que entrega control escolar). El archivo se queda guardado hasta que subas otro — no hay que volver a subirlo cada vez que alguien pida una constancia.
+2. **Cargar el padrón de alumnos.** Ve a **Datos** (barra superior) → sube el archivo `.xls`, `.xlsx` o `.csv` con los alumnos (el que entrega control escolar). El archivo se queda guardado hasta que subas otro — no hay que volver a subirlo cada vez que alguien pida una constancia.
 
 3. **(Opcional) Cargar alumnos de nuevo ingreso.** Si hay alumnos que todavía no están en el padrón principal (recién llegados de una preparatoria asociada, reinscritos después de mucho tiempo, o que cambiaron de carrera), en esa misma pantalla hay una sección aparte "Alumnos de nuevo ingreso" para subir ese Excel. El sistema los va a encontrar automáticamente al buscar, **pero solo si no existen ya en el padrón principal** — si algún día aparecen ahí, el sistema usa siempre el padrón principal y olvida el archivo de nuevo ingreso para esa cuenta, sin que tengas que hacer nada.
 
-4. **Revisar plantillas.** En "Plantillas" puedes ver qué documentos están configurados (constancia general, en inglés, de prácticas, etc.), añadir uno nuevo, o reemplazar el actual descargándolo, editándolo en Word y volviéndolo a subir. Cada reemplazo guarda la versión anterior por si hay que recuperarla.
+4. **Revisar plantillas.** En **Plantillas** puedes ver qué documentos están configurados (constancia general, en inglés, de prácticas, etc.), añadir uno nuevo, o reemplazar el actual descargándolo, editándolo en Word y volviéndolo a subir. Cada reemplazo guarda la versión anterior por si hay que recuperarla. Revisa cada enero el **lema del año** y el nombre de quien firma.
 
-5. **Revisar carreras.** En "Carreras" se relaciona el código del plan de estudios (ej. `ICO`) con el nombre completo tal como debe aparecer impreso, y cuántos semestres dura. Si aparece una carrera nueva o cambia la duración de un plan, se da de alta ahí, sin ayuda de un programador.
+5. **Revisar carreras.** En **Carreras** se relaciona el código del plan de estudios (ej. `ICO`) con el nombre completo tal como debe aparecer impreso, y cuántos semestres dura. Si aparece una carrera nueva o cambia la duración de un plan, se da de alta ahí, sin ayuda de un programador.
 
 ## Generar una constancia (admin o invitado)
 
-1. En la pantalla principal, escribe el **número de cuenta** o **parte del nombre** del alumno en el buscador Mientras escribes aparecen sugerencias: elige al alumno con un clic o con las flechas y Enter (el atajo `/` salta directo al buscador).
+1. En la pantalla principal, escribe el **número de cuenta** o **parte del nombre** del alumno en el buscador. Mientras escribes aparecen sugerencias: elige al alumno con un clic o con las flechas y Enter (el atajo `/` salta directo al buscador).
 2. Si hay más de una plantilla disponible, elige el tipo de constancia.
 3. Se abre el formulario con casi todo ya llenado: nombre, carrera, semestre, fechas del periodo. A la derecha se ve una **vista previa en vivo** del documento — cada cambio que hagas se refleja ahí en un par de segundos.
 4. Revisa/completa lo que falte:
    - El **género** puede no venir marcado si el padrón no trae esa columna — selecciónalo a mano.
    - Las **líneas opcionales** (promedio, periodo vacacional, línea libre) tienen un interruptor: si lo apagas o las dejas vacías, esa línea desaparece por completo del documento final, en vez de imprimirse en blanco.
-   - La barra de "comodines" sobre la línea libre te permite insertar un texto guardado de antes, o guardar el que acabas de escribir para reutilizarlo después.
+   - Sobre la línea libre, **Insertar frase guardada** pone un texto guardado antes, y **Guardar frase** guarda el que acabas de escribir para reutilizarlo (lo ven todos los usuarios).
 5. Cuando esté todo correcto, descarga en **PDF** (listo para imprimir o enviar) o **Word** (para seguir editando). La barra de descarga avisa si quedó algún campo importante vacío. Al terminar, el sistema ofrece buscar otro alumno, y las últimas constancias quedan en «Recientes en este equipo» para volver a generarlas con un clic.
 
 ## Buscar por nombre cuando no tienes la cuenta a la mano
@@ -68,11 +68,11 @@ Si escribes texto en vez de un número, el sistema busca por nombre (no importan
 
 ## Panel de salud del padrón
 
-En "Gestionar datos" hay un resumen rápido y de solo lectura: cuántos alumnos hay en total, a cuántos les falta la columna de género, y cuántos existen solo en el archivo de nuevo ingreso (todavía no en el padrón principal). Sirve para detectar de un vistazo si algo quedó mal cargado antes de que alguien pida una constancia y se dé cuenta a medias.
+En **Datos** hay un resumen rápido y de solo lectura: cuántos alumnos hay en total, a cuántos les falta la columna de género, y cuántos existen solo en el archivo de nuevo ingreso (todavía no en el padrón principal). Sirve para detectar de un vistazo si algo quedó mal cargado antes de que alguien pida una constancia y se dé cuenta a medias.
 
 ## Acciones que piden confirmación
 
-Cualquier acción que borra algo (eliminar una plantilla, una carrera, un comodín, el archivo de nuevo ingreso, o reemplazar el padrón/una plantilla ya cargados) pide confirmación antes de ejecutarse — nunca se pierde información sin avisar primero. Para lo más delicado (eliminar una plantilla completa, con todo su historial) el sistema pide además escribir el nombre corto de la plantilla, como paso extra de seguridad.
+Cualquier acción que borra algo (eliminar una plantilla, una carrera, una frase guardada, el archivo de nuevo ingreso, o reemplazar el padrón/una plantilla ya cargados) pide confirmación antes de ejecutarse — nunca se pierde información sin avisar primero. Para lo más delicado (eliminar una plantilla completa, con todo su historial) el sistema pide además escribir el nombre corto de la plantilla, como paso extra de seguridad.
 
 ## Accesibilidad
 
@@ -80,14 +80,14 @@ La aplicación respeta la preferencia de "reducir movimiento" del sistema operat
 
 ## Preguntas frecuentes
 
-**¿Por qué no aparece el semestre en letra de un alumno de nuevo ingreso?**
-A propósito: el archivo de nuevo ingreso no siempre indica el semestre real del alumno en este plantel, así que el sistema prefiere dejarlo en blanco (para que lo llenes tú si aplica) en vez de calcular un número que podría estar mal.
+**¿Cómo se calcula el semestre de un alumno de nuevo ingreso?**
+Igual que para el resto: comparando la columna Periodo de su archivo con el periodo activo. Si el alumno viene de otro plantel, cambió de carrera o se reinscribió, ese número puede no ser su semestre real; revísalo en cada constancia y corrígelo a mano si hace falta.
 
 **Subí el padrón por error, ¿pierdo lo que ya tenía?**
-El sistema pide confirmación antes de reemplazarlo si ya había uno cargado, mostrando el nombre y cantidad de alumnos que se van a reemplazar, precisamente para evitar errores de este tipo.
+Antes de reemplazarlo, el sistema pide confirmación y muestra el nombre y la cantidad de alumnos del padrón actual. Una vez confirmado **no se puede deshacer** desde la pantalla: vuelve a subir el archivo correcto, o pide al responsable del equipo restaurar el último respaldo (ver [OPERACION.md](OPERACION.md#restaurar-un-respaldo)).
 
 **¿Puedo tener varias plantillas de constancia a la vez?**
-Sí — "constancia general", "en inglés", "de prácticas profesionales", las que hagan falta. Aparecen como opción al generar, en cuanto las das de alta en "Plantillas".
+Sí — "constancia general", "en inglés", "de prácticas profesionales", las que hagan falta. Aparecen como opción al generar, en cuanto las das de alta en **Plantillas**. Ojo: los datos que calcula el sistema (fechas en letra, semestre, promedios) siempre salen en español; en una plantilla en inglés escribe esos datos con campos propios de texto libre.
 
 **Cambié algo en la plantilla y ahora un dato sale mal, ¿cómo lo arreglo?**
-En "Gestionar plantillas" puedes ver el historial de versiones anteriores y restaurar cualquiera con un clic — nunca se pierde la versión anterior al reemplazar.
+En **Plantillas → Versiones anteriores** puedes ver el historial de versiones anteriores y restaurar cualquiera con un clic — nunca se pierde la versión anterior al reemplazar.

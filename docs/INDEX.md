@@ -1,28 +1,35 @@
 # Documentación — Generador de Constancias UAEM Tianguistenco
 
-Índice de toda la documentación del proyecto. El [README](../README.md) en la raíz cubre instalación y despliegue con Docker; aquí vive la documentación de fondo, separada por audiencia.
+Toda la documentación del proyecto, separada por quién la necesita.
 
-## Para usar el sistema día a día
+## Para quien usa el sistema
 
-→ **Dentro del propio sistema:** botón **Modo ayuda** (o tecla `?`) en cualquier pantalla, y el **Centro de ayuda** en `/ayuda`, con guías paso a paso que se pueden imprimir. Es la referencia principal para quien usa el sistema.
+→ **Dentro del propio sistema** (la referencia principal, siempre actualizada):
+- **Modo ayuda**: botón en la barra superior o tecla `?`; explica cualquier zona de la pantalla al hacer clic.
+- **Centro de ayuda** (`/ayuda`, botón *Guías*): 13 guías paso a paso con buscador; se pueden imprimir.
 
-→ **[MANUAL_USUARIO.md](MANUAL_USUARIO.md)** — resumen en un solo archivo para leer fuera del sistema; guía para personal administrativo (admin/invitado): primeros pasos de cada semestre, cómo generar una constancia, panel de salud del padrón, preguntas frecuentes.
+→ **[MANUAL_USUARIO.md](MANUAL_USUARIO.md)**: resumen en un solo archivo para leer fuera del sistema.
 
-## Para mantener o extender el código
+## Para quien administra el servidor
 
-→ **[TECNICA.md](TECNICA.md)** — arquitectura, módulos, modelo de datos, sistema de placeholders, endpoints, pruebas y despliegue. Incluye diagramas de arquitectura, flujo de datos y secuencia de generación.
+→ **[OPERACION.md](OPERACION.md)**: instalación, arranque automático, actualización, respaldos y restauración, cambio de contraseña, verificación, problemas comunes, mudanza a otro equipo y calendario de mantenimiento.
+
+## Para quien mantiene o extiende el código
+
+→ **[TECNICA.md](TECNICA.md)**: arquitectura, módulos, modelo de datos (formato de cada archivo), flujos, motor de plantillas, reglas de negocio, frontend, sistema de ayuda, endpoints, seguridad, rendimiento, pruebas, **recetas para cambios comunes**, convenciones e historial de decisiones.
+
+→ **[MEJORAS_FUTURAS.md](MEJORAS_FUTURAS.md)**: 24 mejoras priorizadas (P0–P3) con esfuerzo, problema que resuelven y dónde tocar el código.
+
+→ **[../CHANGELOG.md](../CHANGELOG.md)**: qué cambió en cada versión.
 
 ## Diagramas
 
-Fuente editable con [Mermaid](https://mermaid.js.org/); las versiones renderizadas (`.svg`) están embebidas en los documentos de arriba y también disponibles sueltas en [diagramas/](diagramas/):
+Los diagramas vigentes están en **Mermaid dentro de [TECNICA.md](TECNICA.md)** (GitHub los dibuja solo): arquitectura, flujo de datos, secuencia de generación y ciclo de vida de una plantilla.
 
-| Diagrama | Dónde se usa |
-|---|---|
-| [arquitectura.svg](diagramas/arquitectura.svg) | Módulos del sistema y sus relaciones — TECNICA.md §2 |
-| [flujo-datos.svg](diagramas/flujo-datos.svg) | Padrón principal + nuevo ingreso → búsqueda → generación — TECNICA.md §3 |
-| [secuencia-generar.svg](diagramas/secuencia-generar.svg) | Interacción navegador ↔ servidor ↔ LibreOffice al generar — TECNICA.md §4 |
-| [flujo-usuario.svg](diagramas/flujo-usuario.svg) | Recorrido por rol (admin/invitado) — MANUAL_USUARIO.md |
+Los `.svg` de [diagramas/](diagramas/) son de la versión anterior al rediseño de noviembre de 2026 (no incluyen el sistema de ayuda); se conservan como referencia hasta regenerarlos (ver mejora #24).
 
-## Historial de este proyecto
+## Cómo mantener esta documentación
 
-Construido de forma incremental: padrón + plantilla universal → catálogo de carreras dinámico y rediseño Material → robustez de largo plazo, multi-plantilla, lotes → alumnos de nuevo ingreso (reemplazando la generación por lotes, que no se usaba) → ronda de animaciones/confirmaciones/accesibilidad → rediseño centrado en el usuario final: barra común, modo ayuda, recorridos generados desde la ayuda, centro de ayuda integrado, buscador en vivo y lista de preparación del semestre. El detalle de cada decisión de diseño relevante está en [TECNICA.md §10](TECNICA.md#10-historial-de-decisiones-relevantes).
+- Cambia la documentación **en el mismo commit** que el código que describe.
+- Lo que el personal necesita para usar el sistema va en las guías integradas (`app/templates/ayuda/articulos/`), no aquí.
+- Registra cada cambio en el [CHANGELOG](../CHANGELOG.md).

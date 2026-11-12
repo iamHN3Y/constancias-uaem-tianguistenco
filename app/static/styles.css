@@ -803,10 +803,21 @@ a:focus-visible{ outline: 3px solid color-mix(in srgb, var(--primary) 45%, trans
 /* ---------- Pie ---------- */
 .pie{
   max-width: 1400px; margin: 0 auto; padding: 18px 16px 28px;
-  display: flex; flex-wrap: wrap; gap: 8px 16px; justify-content: space-between; align-items: center;
+  display: flex; flex-direction: column; gap: 12px;
   border-top: 1px solid var(--outline-variant);
   font-size: 13px; color: var(--on-surface-variant);
 }
+.pie-fila{ display: flex; flex-wrap: wrap; gap: 8px 16px; justify-content: space-between; align-items: center; }
+.pie-firma{ padding-top: 12px; border-top: 1px dashed color-mix(in srgb, var(--outline-variant) 70%, transparent); font-size: 12px; }
+.pie-firma a{ display: inline-flex; align-items: center; gap: 6px; color: var(--on-surface-variant); font-weight: 500; }
+.pie-firma a:hover{ color: var(--primary); }
+.pie-firma .ico{ width: 16px; height: 16px; }
+/* Firma del autor: discreta, con un latido suave al pasar el cursor. */
+.firma{ display: inline-flex; align-items: center; gap: 5px; font-style: italic; letter-spacing: .2px; }
+.firma .corazon{ width: 13px; height: 13px; fill: var(--gold); transition: transform var(--dur-base) var(--ease-emph); }
+.firma:hover .corazon{ animation: latido 1s ease-in-out infinite; }
+.firma-iniciales{ font-family: Metropolis, system-ui, sans-serif; font-style: normal; font-weight: 600; letter-spacing: 1.5px; color: var(--secondary); }
+@keyframes latido{ 0%, 100%{ transform: scale(1); } 15%{ transform: scale(1.25); } 30%{ transform: scale(1); } 45%{ transform: scale(1.18); } }
 
 /* ---------- Tarjetas: variantes ---------- */
 .card-cab{ display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; flex-wrap: wrap; }

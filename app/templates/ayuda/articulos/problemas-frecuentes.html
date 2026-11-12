@@ -14,7 +14,7 @@
   <summary>El semestre o las fechas del periodo salen vacíos</summary>
   <ul>
     <li>Falta configurar el <strong>periodo activo</strong>. El administrador lo hace en Inicio, una vez por semestre (<a href="/ayuda/inicio-de-semestre#periodo">ver cómo</a>). Mientras tanto puedes escribirlos a mano en el formulario.</li>
-    <li>Si el alumno es de <strong>nuevo ingreso</strong>, el semestre sale vacío a propósito: escríbelo tú.</li>
+    <li>Si el alumno es de <strong>nuevo ingreso</strong> y no trae periodo en su archivo, tampoco se puede calcular: escríbelo tú.</li>
     <li>Si el alumno no tiene periodo de ingreso en el padrón (columna PerInicio), tampoco se puede calcular.</li>
   </ul>
 </details>
@@ -56,7 +56,7 @@
 
 <details class="faq" id="plantilla-rechazada">
   <summary>El sistema rechaza mi plantilla o mi padrón</summary>
-  <p>Cuando un archivo tiene un problema se rechaza y lo que ya estaba cargado <strong>no se modifica</strong>. Para plantillas: debe ser .docx (no .doc ni PDF). Para el padrón: debe tener una columna «Cuenta». <a href="/ayuda/cargar-padron#rechazado">Ver todas las causas</a>.</p>
+  <p>Cuando un archivo tiene un problema se rechaza y lo que ya estaba cargado <strong>no se modifica</strong>. Para plantillas: debe ser .docx (no .doc ni PDF) y tener al menos un campo <code>[[ ]]</code>. Para el padrón: debe tener una columna «Cuenta». <a href="/ayuda/cargar-padron#rechazado">Ver todas las causas</a>.</p>
 </details>
 
 <details class="faq" id="contrasena">
